@@ -349,15 +349,27 @@ export default function App() {
 
   if (screen === 'landing') return <Landing onDemo={handleDemo} onCreateWallet={() => setScreen('create')} onImportWallet={() => setScreen('import')} onLogin={() => setScreen('login')} onMetaMask={(w: Wallet) => {
               // Check if this wallet address already has a saved account
-              const savedAcct = localStorage.getItem(`pmt_account_${w.address.toLowerCase()}`);
-              if (savedAcct) {
-                // Returning user — load their username and go straight to chat
+              const addr = w.address.toLowerCase();
+              const savedAcct = localStorage.getItem(`pmt_account_${addr}`);
+              // Also check if there's an active session for this address
+              let sessMatch = false;
+              try {
+                const sess = localStorage.getItem('pmt_session');
+                if (sess) {
+                  const s = JSON.parse(sess);
+                  if (s.address?.toLowerCase() === addr) sessMatch = true;
+                }
+              } catch {}
+
+              if (savedAcct || sessMatch) {
+                // Returning user — go straight to chat
                 try {
-                  const acct = JSON.parse(savedAcct);
-                  const fullWallet = { ...w, username: acct.username };
+                  const acct = savedAcct ? JSON.parse(savedAcct) : null;
+                  const username = acct?.username || addr.slice(0,8);
+                  const fullWallet = { ...w, username };
                   setWallet(fullWallet);
                   walletRef.current = fullWallet;
-                  localStorage.setItem('pmt_session', JSON.stringify({ username: acct.username, address: w.address }));
+                  localStorage.setItem('pmt_session', JSON.stringify({ username, address: w.address }));
                   setScreen('chat');
                 } catch {
                   setWallet(w); walletRef.current = w; setScreen('metamask_setup');
@@ -370,7 +382,18 @@ export default function App() {
   if (screen === 'create') return <CreateWalletFlow onWallet={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'import') return <ImportWalletFlow onWallet={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'login') return <LoginScreen onLogin={handleWallet} onBack={() => setScreen('landing')} />;
-  if (screen === 'metamask_setup' && wallet) return <SetupMetaMaskFlow wallet={wallet} onDone={(username) => { setWallet(w => w ? { ...w, username } : w); setScreen('chat'); }} onSkip={() => setScreen('chat')} />;
+  if (screen === 'metamask_setup' && wallet) return <SetupMetaMaskFlow wallet={wallet} onDone={(username) => { setWallet(w => w ? { ...w, username } : w); setScreen('chat'); }} onSkip={() => {
+                // Save minimal account so returning users skip setup next time
+                try {
+                  const addr = walletRef.current?.address?.toLowerCase();
+                  if (addr && !localStorage.getItem(`pmt_account_${addr}`)) {
+                    const acct = { username: addr.slice(0,8), address: walletRef.current?.address, isMetaMask: true, skipped: true, createdAt: Date.now() };
+                    localStorage.setItem(`pmt_account_${addr}`, JSON.stringify(acct));
+                    localStorage.setItem('pmt_session', JSON.stringify({ username: acct.username, address: walletRef.current?.address }));
+                  }
+                } catch {}
+                setScreen('chat');
+              }} />;
 
   return (
     <AppContext.Provider value={{ wallet, profile, isDemo, darkMode, toggleTheme }}>
