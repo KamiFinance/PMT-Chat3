@@ -190,14 +190,21 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         setWcUri(null);
         setWcConnecting(false);
         resetWCProvider();
-        if(e.message?.includes('User rejected')) setErr('Connection rejected.');
-        else if(e.message?.includes('reset')) { /* silently ignore modal close */ }
-        else setErr('WalletConnect: '+(e.message||String(e)));
+        const msg = e.message||String(e);
+        if(msg.includes('User rejected')||msg.includes('rejected')) setErr('Connection rejected.');
+        else if(msg.includes('reset')||msg.includes('closed')) { /* silently ignore */ }
+        else if(msg.includes('Project')||msg.includes('3000')) setErr('wc_no_project');
+        else setErr('WalletConnect: '+msg);
       });
     }catch(e){
       setWcConnecting(false);
       resetWCProvider();
-      setErr('WalletConnect failed: '+(e.message||String(e)));
+      const msg = e.message||String(e);
+      if(msg.includes('Project ID') || msg.includes('project')){
+        setErr('wc_no_project');
+      } else {
+        setErr('WalletConnect: '+msg);
+      }
     }
   };
 
@@ -256,12 +263,28 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         </div>
 
         {/* Error */}
-        {err&&(
+        {err==='wc_no_project'?(
+          <div style={{background:'rgba(59,153,252,.08)',border:'1px solid rgba(59,153,252,.25)',
+            borderRadius:10,padding:'12px 14px',fontSize:12.5,lineHeight:1.6}}>
+            <div style={{fontWeight:600,color:'#3B99FC',marginBottom:4}}>🔑 WalletConnect Project ID needed</div>
+            <div style={{color:'var(--text2)',fontSize:12}}>
+              Get your free Project ID at{' '}
+              <a href="https://cloud.reown.com" target="_blank" rel="noreferrer"
+                style={{color:'#3B99FC',fontWeight:500}}>cloud.reown.com</a>
+              {' '}→ Create project → copy the ID → add to Vercel as{' '}
+              <code style={{fontFamily:'var(--mono)',fontSize:10,background:'var(--surface)',
+                padding:'1px 5px',borderRadius:4}}>VITE_WC_PROJECT_ID</code>
+            </div>
+            <button onClick={()=>setErr(null)}
+              style={{marginTop:8,padding:'4px 10px',background:'transparent',border:'1px solid rgba(59,153,252,.3)',
+                borderRadius:6,color:'#3B99FC',fontSize:11,cursor:'pointer'}}>Dismiss</button>
+          </div>
+        ):err?(
           <div style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.3)',
             borderRadius:10,padding:'10px 14px',fontSize:12.5,color:'var(--danger)',lineHeight:1.5}}>
             {err}
           </div>
-        )}
+        ):null}
 
         {/* Desktop EIP-6963 wallet picker */}
         {showPicker&&!mobile&&(

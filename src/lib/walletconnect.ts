@@ -5,6 +5,9 @@ let wcProvider: any = null;
 
 export async function getWCProvider() {
   if (wcProvider) return wcProvider;
+  if (!WC_PROJECT_ID || WC_PROJECT_ID.length < 20) {
+    throw new Error('WalletConnect Project ID not configured. Get a free one at cloud.reown.com and add it as VITE_WC_PROJECT_ID in Vercel environment variables.');
+  }
   const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
   wcProvider = await EthereumProvider.init({
     projectId: WC_PROJECT_ID,
