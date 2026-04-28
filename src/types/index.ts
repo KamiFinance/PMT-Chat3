@@ -52,6 +52,12 @@ export interface Message {
   from?: string;
   fromName?: string;
   ts?: number;
+
+  // Sender profile (attached when message received)
+  senderName?: string;
+  senderAddress?: string;
+  senderAvatarUrl?: string | null;
+  senderBio?: string;
 }
 
 export interface InboxMessage {

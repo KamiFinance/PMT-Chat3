@@ -10,8 +10,71 @@ import ImageBubble from './ImageBubble';
 import FileBubble from './FileBubble';
 import ReactionPicker from './ReactionPicker';
 import HighlightText from '../ui/HighlightText';
+// ── Sender Profile Card (popup when clicking avatar) ──────────────────────
+function SenderProfileCard({msg, contact, onClose}) {
+  const name = msg.senderName || contact?.name || 'Unknown';
+  const avatarUrl = msg.senderAvatarUrl || contact?.avatarUrl || null;
+  const initials = (msg.senderName || contact?.avatar || '??').slice(0, 2).toUpperCase();
+  const color = contact?.color || '#a78bfa';
+  const bg = contact?.bg || '#1e1b30';
+  const bio = msg.senderBio || '';
+  const address = msg.senderAddress || contact?.address || '';
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',
+      justifyContent:'center',zIndex:300,animation:'fadeIn .15s ease'}}
+      onClick={onClose}>
+      <div style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:18,
+        padding:'28px 24px',width:300,display:'flex',flexDirection:'column',alignItems:'center',gap:12,
+        animation:'slideUp .2s ease'}} onClick={e=>e.stopPropagation()}>
+        {/* Avatar */}
+        <div style={{position:'relative'}}>
+          {avatarUrl
+            ? <img src={avatarUrl} style={{width:72,height:72,borderRadius:'50%',objectFit:'cover',
+                border:'2px solid '+color}} alt={name}/>
+            : <div style={{width:72,height:72,borderRadius:'50%',background:bg,
+                border:'2px solid '+color,display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:22,fontWeight:700,color:color}}>{initials}</div>
+          }
+          <div style={{position:'absolute',bottom:2,right:2,width:14,height:14,borderRadius:'50%',
+            background:'var(--accent3)',border:'2px solid var(--panel)'}}/>
+        </div>
+        {/* Name */}
+        <div style={{fontSize:18,fontWeight:700,color:'var(--text)',textAlign:'center'}}>{name}</div>
+        {/* Address */}
+        {address && (
+          <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',
+            background:'var(--surface)',borderRadius:8,padding:'5px 12px',
+            wordBreak:'break-all',textAlign:'center'}}>
+            {address.length > 20 ? address.slice(0,10)+'...'+address.slice(-8) : address}
+          </div>
+        )}
+        {/* Bio */}
+        {bio && (
+          <div style={{fontSize:13,color:'var(--text2)',textAlign:'center',lineHeight:1.5,
+            background:'var(--surface)',borderRadius:10,padding:'10px 14px',width:'100%'}}>
+            {bio}
+          </div>
+        )}
+        {/* PMT Chain badge */}
+        <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent2)',
+          background:'rgba(167,139,250,.1)',border:'1px solid rgba(167,139,250,.3)',
+          borderRadius:20,padding:'3px 12px',letterSpacing:'1px'}}>
+          PMT CHAIN USER
+        </div>
+        <button onClick={onClose}
+          style={{marginTop:4,padding:'9px 32px',background:'var(--surface)',border:'1px solid var(--border)',
+            borderRadius:10,color:'var(--muted)',fontSize:13,cursor:'pointer'}}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
   const [showPicker,setShowPicker]=useState(false);
+  const [showSenderProfile,setShowSenderProfile]=useState(false);
   const reactions=msg.reactions||{};
   const reactionEntries=Object.entries(reactions).filter(([,v])=>v>0);
   const longPressRef=useRef(null);
@@ -131,7 +194,18 @@ export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
     <div style={{position:'relative'}} onMouseEnter={()=>setShowPicker(true)}
       onTouchStart={handleLongPress} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
       <div style={{display:'flex',alignItems:'flex-end',gap:8,marginBottom:3,flexDirection:isOut?'row-reverse':'row',animation:'fadeIn .2s ease'}}>
-        {!isOut&&<ProfilePic initials={contact?.avatar} avatarUrl={contact?.avatarUrl} color={contact?.color} bg={contact?.bg} size={26} fs={10}/>}
+        {!isOut&&(
+          <div onClick={()=>setShowSenderProfile(true)} style={{cursor:'pointer',flexShrink:0}}
+            title={'View ' + (msg.senderName||contact?.name||'profile')}>
+            <ProfilePic
+              initials={msg.senderName?.slice(0,2).toUpperCase()||contact?.avatar}
+              avatarUrl={msg.senderAvatarUrl!==undefined?msg.senderAvatarUrl:contact?.avatarUrl}
+              color={contact?.color}
+              bg={contact?.bg}
+              size={28} fs={10}
+            />
+          </div>
+        )}
         <TxCard msg={msg} isOut={isOut}/>
       </div>
       {reactionsBar}{picker}
@@ -144,11 +218,23 @@ export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
     </div>
   );
   return(
+    <>
     <div id={'msg-'+msg.id} style={{position:'relative',marginBottom:3}}
       onMouseEnter={()=>setShowPicker(true)}
       onTouchStart={handleLongPress} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
       <div style={{display:'flex',alignItems:'flex-end',gap:8,flexDirection:isOut?'row-reverse':'row',animation:'fadeIn .2s ease'}}>
-        {!isOut&&<ProfilePic initials={contact?.avatar} avatarUrl={contact?.avatarUrl} color={contact?.color} bg={contact?.bg} size={26} fs={10}/>}
+        {!isOut&&(
+          <div onClick={()=>setShowSenderProfile(true)} style={{cursor:'pointer',flexShrink:0}}
+            title={'View ' + (msg.senderName||contact?.name||'profile')}>
+            <ProfilePic
+              initials={msg.senderName?.slice(0,2).toUpperCase()||contact?.avatar}
+              avatarUrl={msg.senderAvatarUrl!==undefined?msg.senderAvatarUrl:contact?.avatarUrl}
+              color={contact?.color}
+              bg={contact?.bg}
+              size={28} fs={10}
+            />
+          </div>
+        )}
         <div className="msg-bubble-text" style={{maxWidth:'68%',padding:'9px 13px',borderRadius:16,fontSize:13.5,lineHeight:1.5,
           ...(isOut?{background:'#1a2a4a',border:'1px solid rgba(99,210,255,.15)',borderBottomRightRadius:4}
                    :{background:'var(--surface2)',border:'1px solid var(--border)',borderBottomLeftRadius:4})}}>
@@ -162,5 +248,13 @@ export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
       {reactionsBar}
       {picker}
     </div>
+    {showSenderProfile&&(
+      <SenderProfileCard
+        msg={msg}
+        contact={contact}
+        onClose={()=>setShowSenderProfile(false)}
+      />
+    )}
+    </>
   );
 }

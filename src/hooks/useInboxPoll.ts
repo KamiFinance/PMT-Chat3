@@ -5,6 +5,12 @@ import { storage } from '../lib/storage';
 import { getIpfsUrl } from '../lib/pinata';
 import { now, rndHash, uid, normalizeAddress } from '../lib/utils';
 
+// Extend InboxMessage locally with profile fields
+interface InboxMsgWithProfile extends InboxMessage {
+  fromAvatarUrl?: string | null;
+  fromBio?: string;
+}
+
 interface UseInboxPollParams {
   wallet: Wallet | null;
   isDemo: boolean;
@@ -90,7 +96,7 @@ export function useInboxPoll({
     try {
       const raw = localStorage.getItem(inboxKey);
       if (!raw) return;
-      const incoming: InboxMessage[] = JSON.parse(raw);
+      const incoming: InboxMsgWithProfile[] = JSON.parse(raw);
       if (!incoming.length) return;
 
       // Clear inbox immediately to prevent reprocessing
@@ -119,6 +125,19 @@ export function useInboxPoll({
         }
 
         // ── Build new message ──────────────────────────────────────────────
+        // Try to read sender's saved profile from localStorage
+        let senderAvatarUrl: string | null = inboxMsg.fromAvatarUrl ?? null;
+        let senderBio: string = inboxMsg.fromBio ?? '';
+        try {
+          const profileKey = `pmt_profile_${senderAddr}`;
+          const savedProfile = localStorage.getItem(profileKey);
+          if (savedProfile) {
+            const p = JSON.parse(savedProfile);
+            if (p.avatarUrl) senderAvatarUrl = p.avatarUrl;
+            if (p.bio) senderBio = p.bio;
+          }
+        } catch { /* ignore */ }
+
         const base: Message = {
           id: inboxMsg.id || uid(),
           out: false,
@@ -131,6 +150,10 @@ export function useInboxPoll({
           read: false,
           onChain: !!(inboxMsg.chain || inboxMsg.onChain),
           chain: inboxMsg.chain ?? 'pmt',
+          senderName: inboxMsg.fromName ?? senderAddr.slice(0, 8),
+          senderAddress: senderAddr,
+          senderAvatarUrl,
+          senderBio,
         };
 
         let extra: Partial<Message> = {};
