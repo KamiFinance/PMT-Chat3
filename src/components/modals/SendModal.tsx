@@ -1,73 +1,112 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { useApp } from '../../lib/context';
 
 export default function SendModal({contact, onClose, onSend, isDemo}) {
   const [amount, setAmount] = useState('');
   const [sending, setSending] = useState(false);
-  const [done, setDone] = useState(false);
+  const [txHash, setTxHash] = useState(null);
   const [err, setErr] = useState(null);
 
-  const send = async () => {
-    const amt = parseFloat(amount);
-    if (!amount || isNaN(amt) || amt <= 0) return setErr('Enter a valid amount');
-    if (isDemo) {
-      setSending(true);
-      await new Promise(r => setTimeout(r, 800));
-      setSending(false);
-      setDone(true);
-      setTimeout(() => { onSend(amount); onClose(); }, 1200);
-      return;
-    }
-    setSending(true);
-    setErr(null);
+  const invalidAddr = !isDemo && contact?.address && !/^0x[0-9a-fA-F]{40}$/.test(contact.address);
+
+  const go = async () => {
+    if (!parseFloat(amount) || parseFloat(amount) <= 0) return setErr('Enter a valid amount');
+    setSending(true); setErr(null);
     try {
-      await new Promise(r => setTimeout(r, 600));
-      onSend(amount);
-      setDone(true);
-      setTimeout(onClose, 1200);
+      const hash = await onSend(amount);
+      if (hash) { setTxHash(hash); }
+      else { onClose(); }
     } catch(e) {
-      setErr(e.message || 'Transaction failed');
+      if (e.code === 4001) setErr('Transaction rejected in wallet.');
+      else setErr(e.message || 'Transaction failed');
       setSending(false);
     }
   };
 
+  // Success screen
+  if (txHash) return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',
+      justifyContent:'center',zIndex:200}} onClick={onClose}>
+      <div className="modal-inner" style={{background:'var(--panel)',border:'1px solid var(--border)',
+        borderRadius:16,padding:'28px',width:340,display:'flex',flexDirection:'column',
+        gap:14,alignItems:'center',textAlign:'center',animation:'slideUp .25s ease'}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:40}}>✅</div>
+        <div style={{fontSize:17,fontWeight:600}}>Transaction Sent!</div>
+        <div style={{fontSize:13,color:'var(--text2)'}}>
+          Sent <strong style={{color:'var(--accent)'}}>{amount} PMT</strong> to {contact.name}
+        </div>
+        <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',wordBreak:'break-all',
+          background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'8px 12px',width:'100%'}}>
+          {txHash.slice(0,20)}...{txHash.slice(-10)}
+        </div>
+        <button onClick={onClose} style={{width:'100%',padding:11,background:'var(--accent)',border:'none',
+          borderRadius:9,color:'#0a0c14',fontWeight:600,fontSize:13.5,cursor:'pointer'}}>Done</button>
+      </div>
+    </div>
+  );
+
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',
-      alignItems:'center',justifyContent:'center',zIndex:200}} onClick={onClose}>
-      <div style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:18,
-        padding:'24px 22px',width:320,display:'flex',flexDirection:'column',gap:16,
-        animation:'slideUp .25s ease'}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{fontSize:16,fontWeight:700}}>Send PMT</div>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--muted)',
-            fontSize:22,cursor:'pointer',lineHeight:1}}>×</button>
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',
+      justifyContent:'center',zIndex:200}} onClick={onClose}>
+      <div className="modal-inner" style={{background:'var(--panel)',border:'1px solid var(--border)',
+        borderRadius:16,padding:'28px',width:340,display:'flex',flexDirection:'column',
+        gap:14,animation:'slideUp .25s ease'}} onClick={e=>e.stopPropagation()}>
+
+        <div style={{fontSize:17,fontWeight:600}}>Send PMT</div>
+        <div style={{fontSize:12,color:'var(--text2)'}}>
+          To: <span style={{color:'var(--accent)'}}>{contact.name}</span>
         </div>
-        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,
-          padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>
-          To: <span style={{color:'var(--accent)',fontFamily:'var(--mono)'}}>{contact.name}</span>
-        </div>
-        <div>
-          <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--muted)',
-            letterSpacing:'1px',marginBottom:6}}>AMOUNT (PMT)</div>
-          <input type="number" min="0" step="0.001" placeholder="0.000"
+        <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--muted)'}}>{contact.address}</div>
+
+        {invalidAddr && (
+          <div style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.3)',
+            borderRadius:8,padding:'8px 12px',fontSize:12,color:'var(--danger)'}}>
+            ⚠ This contact has a short/demo address. Edit the contact and enter their full wallet address (0x...40 chars) to send real PMT.
+          </div>
+        )}
+
+        {/* Amount input */}
+        <div style={{display:'flex',alignItems:'center',gap:10,background:'var(--surface)',
+          border:'1px solid var(--border)',borderRadius:10,padding:'0 14px'}}>
+          <input type="number" step=".001" min="0" placeholder="0.00"
             value={amount} onChange={e=>{setAmount(e.target.value);setErr(null);}}
-            style={{width:'100%',background:'var(--surface)',border:'1px solid var(--border)',
-              borderRadius:9,padding:'11px 14px',color:'var(--text)',fontSize:16,
-              fontFamily:'var(--mono)',outline:'none'}}/>
+            autoFocus
+            style={{flex:1,background:'transparent',border:'none',outline:'none',color:'var(--text)',
+              fontFamily:'var(--mono)',fontSize:22,padding:'12px 0',fontWeight:700}}/>
+          <span style={{fontFamily:'var(--mono)',fontSize:13,color:'var(--muted)'}}>PMT</span>
         </div>
-        {err && <div style={{fontSize:12,color:'var(--danger)'}}>{err}</div>}
-        <button onClick={send} disabled={sending||done||!amount}
-          style={{padding:'13px',background:done?'var(--accent3)':sending?'rgba(250,255,99,.5)':'var(--accent)',
-            border:'none',borderRadius:10,color:'#000',fontWeight:700,fontSize:14,
-            cursor:sending||done?'default':'pointer',display:'flex',
-            alignItems:'center',justifyContent:'center',gap:8}}>
-          {done ? '✓ Sent!' : sending
-            ? <><span style={{width:14,height:14,border:'2px solid rgba(0,0,0,.3)',
-                borderTopColor:'#0a0c14',borderRadius:'50%',display:'inline-block',
-                animation:'spin .7s linear infinite'}}/>Sending...</>
-            : '↑ Send PMT'}
-        </button>
+
+        {/* Quick amounts */}
+        <div style={{display:'flex',gap:6}}>
+          {['0.001','0.01','0.1','0.5'].map(v=>(
+            <button key={v} onClick={()=>setAmount(v)}
+              style={{flex:1,padding:6,background:'var(--surface)',border:'1px solid var(--border)',
+                borderRadius:6,color:'var(--text2)',fontFamily:'var(--mono)',fontSize:11,cursor:'pointer'}}>
+              {v}
+            </button>
+          ))}
+        </div>
+
+        {err && (
+          <div style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.3)',
+            borderRadius:8,padding:'8px 12px',fontSize:12,color:'var(--danger)'}}>{err}</div>
+        )}
+
+        <div style={{display:'flex',gap:10}}>
+          <button onClick={onClose} disabled={sending}
+            style={{flex:1,padding:10,background:'transparent',border:'1px solid var(--border)',
+              borderRadius:9,color:'var(--text2)',fontSize:13.5,cursor:'pointer'}}>Cancel</button>
+          <button onClick={go} disabled={sending||!amount}
+            style={{flex:2,padding:10,background:'var(--accent3)',border:'none',borderRadius:9,
+              color:'#0a0c14',fontWeight:600,fontSize:13.5,cursor:sending?'default':'pointer',opacity:sending?0.7:1}}>
+            {sending ? 'Confirm in wallet...' : `Send ${amount||'0'} PMT`}
+          </button>
+        </div>
+
+        <p style={{fontSize:11,color:'var(--muted)',textAlign:'center'}}>
+          {isDemo ? 'Demo mode — no real transaction' : 'Transaction will be sent on PMT Chain'}
+        </p>
       </div>
     </div>
   );

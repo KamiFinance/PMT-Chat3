@@ -5,6 +5,20 @@ import { STORAGE_KEYS } from './types';
 import { storage } from './lib/storage';
 import { AppContext } from './lib/context';
 import { now, rndHash, uid, normalizeAddress, shortHash, nextBlock, b64ToObjectUrl } from './lib/utils';
+
+function playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.08);
+    g.gain.setValueAtTime(0.3, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.4);
+  } catch { /* ignore */ }
+}
 import { uploadToPinata, getIpfsUrl } from './lib/pinata';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
@@ -36,8 +50,35 @@ interface Notif {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('landing');
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+  // Auto-restore session if saved
+  const [screen, setScreen] = useState<Screen>(() => {
+    try {
+      const sess = localStorage.getItem('pmt_session');
+      if (sess) {
+        const { username, address } = JSON.parse(sess);
+        if (address && username) return 'chat';
+      }
+    } catch { /* ignore */ }
+    return 'landing';
+  });
+  const [wallet, setWallet] = useState<Wallet | null>(() => {
+    try {
+      const sess = localStorage.getItem('pmt_session');
+      if (sess) {
+        const { username, address } = JSON.parse(sess);
+        if (address) {
+          // Load full wallet data if saved
+          const saved = localStorage.getItem(`pmt_account_${address.toLowerCase()}`);
+          if (saved) {
+            const acc = JSON.parse(saved);
+            return { address, balance: '0.000', network: 'PMT Chain', username: acc.username || username };
+          }
+          return { address, balance: '0.000', network: 'PMT Chain', username };
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
   const [isDemo, setIsDemo] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [msgs, setMsgs] = useState<MsgsMap>({});
@@ -128,9 +169,11 @@ export default function App() {
   }, [msgs, accountKey]);
 
   const pushNotif = useCallback((contact: Contact, text: string) => {
-    const n: Notif = { id: uid(), contact, text, ts: Date.now() };
+    const id = uid();
+    const n: Notif = { id, contact, text, ts: Date.now() };
     setNotifs(p => [...p.slice(-4), n]);
-    setTimeout(() => setNotifs(p => p.filter(x => x.id !== n.id)), 5000);
+    playNotifSound();
+    setTimeout(() => setNotifs(p => p.filter(x => x.id !== id)), 5000);
   }, []);
 
   useInboxPoll({ wallet, isDemo, setMsgs, setContacts, pushNotif });
@@ -286,7 +329,7 @@ export default function App() {
         <div className={`sidebar-overlay${mobileSidebarOpen ? ' visible' : ''}`} onClick={() => setMobileSidebarOpen(false)} />
         <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
         <main className="chat-panel">
-          {active ? <ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={(contact: any, amount: string) => sendMsg({type:'tx', text:`Sent ${amount} PMT`, amount, token:'PMT', _toAddr: normalizeAddress(contact.address)} as any)} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} /> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
+          {active ? <ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} /> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
         </main>
       </div>
       {showProfile && <ProfileModal profile={{ ...profile, address: wallet?.address ?? null }} onClose={() => setShowProfile(false)} onSave={saveProfile} />}
