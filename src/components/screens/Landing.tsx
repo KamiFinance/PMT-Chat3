@@ -1,14 +1,25 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+
+// Detect if user is on a mobile device
+const isMobile = () => /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+
+// Detect if already inside MetaMask in-app browser
+const isMetaMaskBrowser = () => !!(window.ethereum?.isMetaMask) && isMobile();
 
 export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet,onLogin}){
   const [connecting,setConnecting]=useState(false);
   const [err,setErr]=useState(null);
-  const [wallets,setWallets]=useState([]); // EIP-6963 discovered wallets
+  const [wallets,setWallets]=useState([]);
   const [showPicker,setShowPicker]=useState(false);
+  const [mobile,setMobile]=useState(false);
+  const [inMetaMask,setInMetaMask]=useState(false);
 
-  // Discover wallets via EIP-6963 on mount
   useEffect(()=>{
+    setMobile(isMobile());
+    setInMetaMask(isMetaMaskBrowser());
+
+    // EIP-6963: discover extension wallets (desktop)
     const found=[];
     const onAnnounce=(e)=>{
       const {info,provider}=e.detail;
@@ -19,8 +30,13 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     };
     window.addEventListener('eip6963:announceProvider',onAnnounce);
     window.dispatchEvent(new Event('eip6963:requestProvider'));
-    // Re-request after short delay to catch late injectors
-    const t=setTimeout(()=>window.dispatchEvent(new Event('eip6963:requestProvider')),500);
+    const t=setTimeout(()=>{
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+      // Also check window.ethereum on mobile (MetaMask in-app browser)
+      if(window.ethereum?.isMetaMask && found.length===0){
+        setInMetaMask(true);
+      }
+    },600);
     return()=>{window.removeEventListener('eip6963:announceProvider',onAnnounce);clearTimeout(t);};
   },[]);
 
@@ -45,7 +61,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       if(e.code===4001){
         setErr('Connection rejected. Please approve the connection in your wallet.');
       }else if(e.code===-32002){
-        setErr('Wallet has a pending request. Click the wallet icon in your toolbar to approve it.');
+        setErr('Wallet has a pending request. Open MetaMask and approve it.');
       }else{
         setErr('Connection failed: '+(e.message||String(e)));
       }
@@ -54,29 +70,41 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
 
   const handleConnectWallet=()=>{
     setErr(null);
-    // Filter out TronLink — only show EVM wallets
+    // Inside MetaMask mobile browser — use window.ethereum directly
+    if(window.ethereum?.isMetaMask){
+      connectWith(window.ethereum,'MetaMask');
+      return;
+    }
+    // Filter TronLink, only EVM
     const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
     if(evmWallets.length===0){
-      // No EIP-6963 wallets — try legacy window.ethereum
+      if(mobile){
+        // On mobile without MetaMask browser — show deeplink prompt
+        setErr('mobile_no_wallet');
+        return;
+      }
       const p=window.ethereum?.isMetaMask?window.ethereum:null;
       if(p){connectWith(p,'MetaMask');return;}
-      setErr('No Ethereum wallet detected. Please install MetaMask from metamask.io, then refresh.');
+      setErr('No Ethereum wallet detected. Please install MetaMask, then refresh.');
       return;
     }
     if(evmWallets.length===1){
       connectWith(evmWallets[0].provider,evmWallets[0].name);
       return;
     }
-    // Multiple wallets — show picker
     setShowPicker(true);
   };
 
   const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
+  const currentUrl=window.location.href.replace(/^https?:\/\//,'');
+  const metaMaskDeeplink=`https://metamask.app.link/dapp/${currentUrl}`;
 
   return(
-    <div style={{height:'100%',display:'flex',alignItems:'flex-start',justifyContent:'center',background:'var(--bg)',padding:'16px',overflowY:'auto'}}>
+    <div style={{height:'100%',display:'flex',alignItems:'flex-start',justifyContent:'center',
+      background:'var(--bg)',padding:'16px',overflowY:'auto'}}>
       <div style={{width:'100%',maxWidth:420,background:'var(--panel)',border:'1px solid var(--border)',
-        borderRadius:16,padding:'24px 20px',display:'flex',flexDirection:'column',gap:16,marginTop:'auto',marginBottom:'auto'}}>
+        borderRadius:16,padding:'24px 20px',display:'flex',flexDirection:'column',gap:16,
+        marginTop:'auto',marginBottom:'auto'}}>
 
         {/* Brand */}
         <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -88,7 +116,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         </div>
 
         <p style={{fontSize:13.5,color:'var(--text2)',lineHeight:1.6}}>
-          End-to-end encrypted messages stored on the blockchain. No servers. No surveillance. Own your conversations.
+          End-to-end encrypted messages stored on the blockchain. No servers. No surveillance.
         </p>
 
         {/* Feature grid */}
@@ -106,19 +134,40 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           ))}
         </div>
 
-        {/* Error */}
-        {err&&(
+        {/* Error / Mobile no-wallet state */}
+        {err==='mobile_no_wallet'?(
+          <div style={{background:'rgba(167,139,250,.08)',border:'1px solid rgba(167,139,250,.3)',
+            borderRadius:12,padding:'14px',display:'flex',flexDirection:'column',gap:10}}>
+            <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>📱 Open in MetaMask</div>
+            <div style={{fontSize:12,color:'var(--text2)',lineHeight:1.5}}>
+              To connect your wallet on mobile, open this app inside MetaMask's browser.
+            </div>
+            <a href={metaMaskDeeplink}
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+                padding:'12px',background:'#f6851b',border:'none',borderRadius:9,
+                color:'#fff',fontWeight:600,fontSize:13.5,textDecoration:'none',textAlign:'center'}}>
+              🦊 Open in MetaMask App
+            </a>
+            <button onClick={()=>setErr(null)}
+              style={{padding:'6px',background:'transparent',border:'none',color:'var(--muted)',
+                cursor:'pointer',fontSize:12}}>
+              Cancel
+            </button>
+          </div>
+        ):err?(
           <div style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.3)',
             borderRadius:10,padding:'10px 14px',fontSize:12.5,color:'var(--danger)',lineHeight:1.5}}>
             {err}
-            <div style={{marginTop:8}}>
-              <a href="https://metamask.io/download/" target="_blank" rel="noreferrer"
-                style={{color:'var(--accent)',fontWeight:500}}>Download MetaMask →</a>
-            </div>
+            {!mobile&&(
+              <div style={{marginTop:8}}>
+                <a href="https://metamask.io/download/" target="_blank" rel="noreferrer"
+                  style={{color:'var(--accent)',fontWeight:500}}>Download MetaMask →</a>
+              </div>
+            )}
           </div>
-        )}
+        ):null}
 
-        {/* Wallet picker modal */}
+        {/* Wallet picker */}
         {showPicker&&(
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'14px',display:'flex',flexDirection:'column',gap:8}}>
             <div style={{fontSize:12,color:'var(--muted)',fontFamily:'var(--mono)',letterSpacing:'1px',marginBottom:4}}>SELECT WALLET</div>
@@ -139,7 +188,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         )}
 
         {/* Connect Wallet button */}
-        {!showPicker&&(
+        {!showPicker&&err!=='mobile_no_wallet'&&(
           <button onClick={handleConnectWallet} disabled={connecting}
             style={{padding:'13px 20px',
               background:connecting?'rgba(246,133,27,0.5)':'var(--accent)',
@@ -151,7 +200,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
                   borderTopColor:'#000',borderRadius:'50%',display:'inline-block',
                   animation:'spin .7s linear infinite'}}/>Connecting...</>
               :<><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 12h2a2 2 0 0 1 0 4h-2v-4z"/><path d="M2 10h20"/></svg>
-              Connect Wallet{evmWallets.length>1?` (${evmWallets.length} found)`:''}</>}
+              {inMetaMask?'Connect MetaMask':evmWallets.length>1?`Connect Wallet (${evmWallets.length} found)`:'Connect Wallet'}</>}
           </button>
         )}
 
@@ -165,9 +214,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           <button onClick={onCreateWallet}
             style={{padding:'12px 10px',background:'var(--surface)',border:'1px solid var(--border)',
               borderRadius:10,color:'var(--text)',fontSize:13,cursor:'pointer',
-              display:'flex',flexDirection:'column',alignItems:'center',gap:6,transition:'border-color .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent)'}
-            onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
+              display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
             <span style={{fontSize:22,color:'var(--accent)'}}>+</span>
             <span style={{fontWeight:500}}>Create Wallet</span>
             <span style={{fontSize:10,color:'var(--muted)'}}>New self-custody wallet</span>
@@ -175,9 +222,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           <button onClick={onImportWallet}
             style={{padding:'12px 10px',background:'var(--surface)',border:'1px solid var(--border)',
               borderRadius:10,color:'var(--text)',fontSize:13,cursor:'pointer',
-              display:'flex',flexDirection:'column',alignItems:'center',gap:6,transition:'border-color .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent2)'}
-            onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
+              display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
             <span style={{fontSize:22}}>v</span>
             <span style={{fontWeight:500}}>Import Wallet</span>
             <span style={{fontSize:10,color:'var(--muted)'}}>Seed phrase or key</span>
