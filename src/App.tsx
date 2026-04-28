@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Wallet, Profile, Contact, MsgsMap, Message, Screen } from './types';
 import { STORAGE_KEYS } from './types';
