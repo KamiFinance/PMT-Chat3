@@ -1,43 +1,19 @@
 // @ts-nocheck
 import React, { useEffect, useRef } from 'react';
+import QRCode from 'qrcode';
 
-export default function QRInline({ address }: { address: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+export default function QRInline({ address }) {
+  const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (!ref.current || !address) return;
-    ref.current.innerHTML = '';
-
-    const generate = () => {
-      if (!(window as any).QRCode) return;
-      new (window as any).QRCode(ref.current, {
-        text: address,
-        width: 180,
-        height: 180,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: (window as any).QRCode.CorrectLevel.M,
-      });
-    };
-
-    if ((window as any).QRCode) {
-      generate();
-    } else {
-      // Load qrcodejs dynamically
-      if (!document.getElementById('qrcodejs')) {
-        const script = document.createElement('script');
-        script.id = 'qrcodejs';
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-        script.onload = generate;
-        document.head.appendChild(script);
-      } else {
-        const t = setInterval(() => {
-          if ((window as any).QRCode) { clearInterval(t); generate(); }
-        }, 100);
-        return () => clearInterval(t);
-      }
-    }
+    if (!canvasRef.current || !address) return;
+    QRCode.toCanvas(canvasRef.current, address || 'no-address', {
+      width: 180,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    }).catch(err => console.error('QR error:', err));
   }, [address]);
 
-  return <div ref={ref} />;
+  return <canvas ref={canvasRef} style={{ display: 'block' }} />;
 }
