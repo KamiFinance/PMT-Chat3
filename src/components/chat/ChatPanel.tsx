@@ -2,6 +2,7 @@
 import ProfilePic from '../ui/ProfilePic';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { uploadToPinata, getIpfsUrl } from '../../lib/pinata';
+import { now, rndHash, uid, formatSize, currentBlock } from '../../lib/utils';
 
 import Avatar from '../ui/Avatar';
 import Bubble from './Bubble';
@@ -9,7 +10,6 @@ import AttachMenu from './AttachMenu';
 import MobileTopbar from '../ui/MobileTopbar';
 import BlockStrip from '../ui/BlockStrip';
 import SendModal from '../modals/SendModal';
-import { now, rndHash, uid, formatSize } from '../../lib/utils';
 export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);

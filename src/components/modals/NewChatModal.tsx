@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { now } from "../../lib/utils";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import Avatar from '../ui/Avatar';
