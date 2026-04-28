@@ -16,7 +16,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
           {profile?.avatarUrl
             ? <ProfilePic avatarUrl={profile.avatarUrl} initials={profile?.name?profile.name.slice(0,2).toUpperCase():'ME'}
                 color='var(--accent)' bg='#0a1f2a' size={34} fs={11}/>
-            : <img src={'/favicon.svg'} style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt="PMT"/>
+            : <img src={'/pmt-logo.png'} style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt="PMT"/>
           }
         </div>
         <div style={{flex:1,minWidth:0}}>
@@ -78,7 +78,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
               borderLeft:`2px solid ${activeId===c.id?'var(--accent)':'transparent'}`,
               background:activeId===c.id?'var(--surface)':'transparent',transition:'background .12s',
               position:'relative'}}
-            onClick={()=>onSelect(c)}>
+            onClick={()=>{onSelect(c);onMobileClose&&onMobileClose();}}>
             <ProfilePic initials={c.isGroup?'#':c.avatar} avatarUrl={c.avatarUrl} color={c.isGroup?'var(--accent2)':c.color} bg={c.isGroup?'#1e1b30':c.bg} online={c.online}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:'flex',alignItems:'center',gap:4}}>

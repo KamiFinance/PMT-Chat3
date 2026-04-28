@@ -6,6 +6,11 @@
   --accent: #faff63; --accent2: #a78bfa; --accent3: #34d399;
   --danger: #f87171; --text: #e8f4ff; --text2: #9daec8; --muted: #5a6882;
   --mono: 'Space Mono', monospace; --sans: 'DM Sans', sans-serif;
+  /* Safe area for iPhone notch/home indicator */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 body.light-mode {
   --bg: #f0f2f5; --panel: #ffffff; --surface: #f8f9fb; --surface2: #eef0f3;
@@ -28,9 +33,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 @keyframes typingDot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-4px);opacity:1}}
 @keyframes notifSlide{from{opacity:0;transform:translateX(110%)}to{opacity:1;transform:translateX(0)}}
 @keyframes notifOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(110%)}}
+/* Mobile touch improvements */
 *{-webkit-tap-highlight-color:transparent}
 button,a{touch-action:manipulation}
+/* Prevent zoom on input focus (iOS) */
 input,textarea,select{font-size:16px!important}
+/* App layout */
 .app-grid{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
 .sidebar-panel{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .contact-row{position:relative}
@@ -38,23 +46,67 @@ input,textarea,select{font-size:16px!important}
 .chat-panel{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg)}
 .msg-bubble-text{max-width:72%}
 .modal-inner{width:340px;max-width:calc(100vw - 28px)}
+
+/* ── Mobile (≤640px) ──────────────────────────────────── */
 @media(max-width:640px){
-  .app-grid{display:block!important}
-  .sidebar-panel{position:fixed!important;top:0;left:0;bottom:0;width:82vw!important;max-width:300px;z-index:800;transform:translateX(-105%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:6px 0 32px rgba(0,0,0,.6)}
+  /* Full-screen chat, no grid */
+  .app-grid{display:block!important;height:100dvh}
+
+  /* Sidebar: slide-in drawer */
+  .sidebar-panel{
+    position:fixed!important;top:0;left:0;bottom:0;
+    width:82vw!important;max-width:300px;
+    z-index:800;
+    transform:translateX(-105%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    box-shadow:6px 0 32px rgba(0,0,0,.6);
+    /* Account for iOS safe area */
+    padding-top:var(--safe-top);
+  }
   .sidebar-panel.mobile-open{transform:translateX(0)!important}
+
+  /* Backdrop overlay */
   .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:799}
   .sidebar-overlay.visible{display:block!important}
+
+  /* Mobile topbar */
   .mobile-topbar{display:flex!important}
   .desktop-topbar{display:none!important}
+
+  /* Hide block strip on small screens */
   .block-strip-bar{display:none!important}
-  .msg-bubble-text{max-width:84%!important}
-  .modal-inner{width:calc(100vw - 28px)!important;max-width:100%!important}
+
+  /* Wider bubbles on mobile */
+  .msg-bubble-text{max-width:86%!important}
+
+  /* Full-width modals */
+  .modal-inner{width:calc(100vw - 24px)!important;max-width:100%!important}
+
+  /* Better chat input padding */
   .chat-input-row{padding:8px 10px!important}
-  .notif-wrap{right:8px!important;left:8px!important;top:8px!important;max-width:100%!important}
+
+  /* Notifications: full width */
+  .notif-wrap{right:8px!important;left:8px!important;top:calc(8px + var(--safe-top))!important;max-width:100%!important}
   .notif-item{min-width:0!important;max-width:100%!important}
+
+  /* Hide some desktop-only elements */
   .chain-badge{display:none!important}
   .qr-btn{display:none!important}
+
+  /* Chat panel height: account for mobile keyboard and safe areas */
+  .chat-panel{height:100dvh;padding-bottom:var(--safe-bottom)}
+
+  /* Message area padding adjustment */
+  .chat-messages{padding-bottom:calc(60px + var(--safe-bottom))!important}
+
+  /* Bottom nav bar safe area */
+  .sidebar-footer{padding-bottom:calc(8px + var(--safe-bottom))!important}
+
+  /* Full-height landing page on mobile */
+  .landing-scroll{overflow-y:auto!important;-webkit-overflow-scrolling:touch}
 }
+
+/* Desktop */
 @media(min-width:641px){
   .mobile-topbar{display:none!important}
   .sidebar-overlay{display:none!important}

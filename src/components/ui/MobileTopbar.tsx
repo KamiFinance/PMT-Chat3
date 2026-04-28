@@ -36,7 +36,7 @@ export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo
           lineHeight:1,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
         ☰
       </button>
-      <img src={'/favicon.svg'} style={{width:30,height:30,borderRadius:8,objectFit:'cover'}} alt="PMT"/>
+      <img src={'/pmt-logo.png'} style={{width:30,height:30,borderRadius:8,objectFit:'cover'}} alt="PMT"/>
       <div style={{flex:1}}>
         <div style={{fontSize:14,fontWeight:600}}>PMT-Chat</div>
         <div style={{fontFamily:'var(--mono)',fontSize:9,color:isDemo?'var(--muted)':'var(--accent)'}}>

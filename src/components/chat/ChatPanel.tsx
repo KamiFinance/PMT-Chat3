@@ -186,6 +186,8 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   };
   return(
     <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}>
+      {/* Mobile topbar (shown only on mobile via CSS) */}
+      <MobileTopbar contact={contact} onBack={onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
       {/* Header - hidden on mobile (MobileTopbar handles it) */}
       <div className="desktop-topbar" style={{padding:'12px 18px',borderBottom:'1px solid var(--border)',background:'var(--panel)',
         display:'flex',alignItems:'center',gap:10,flexShrink:0}}>

@@ -80,7 +80,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
 
         {/* Brand */}
         <div style={{display:'flex',alignItems:'center',gap:14}}>
-          <img src={'/favicon.svg'} style={{width:52,height:52,borderRadius:14,objectFit:'cover',flexShrink:0}} alt="PMT"/>
+          <img src={'/pmt-logo.png'} style={{width:52,height:52,borderRadius:14,objectFit:'cover',flexShrink:0}} alt="PMT"/>
           <div>
             <div style={{fontSize:22,fontWeight:600}}>PMT-Chat</div>
             <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',letterSpacing:'1.5px',marginTop:2}}>DECENTRALIZED MESSENGER</div>
