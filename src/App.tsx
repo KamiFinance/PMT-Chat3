@@ -23,6 +23,37 @@ import { uploadToPinata, getIpfsUrl } from './lib/pinata';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
 import { AI_AGENT_ADDRESS, AI_AGENT_CONTACT } from './constants/ai';
+
+// ── Chat error boundary ────────────────────────────────────────────────────
+class ChatErrorBoundary extends React.Component<
+  {children: React.ReactNode; onReset: () => void},
+  {error: Error | null}
+> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) { return { error: e }; }
+  componentDidCatch(e: Error) { console.error('[ChatPanel error]', e); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+          gap:12,padding:32,background:'var(--bg)'}}>
+          <div style={{fontSize:32}}>⚠️</div>
+          <div style={{fontSize:15,fontWeight:600,color:'var(--danger)'}}>Chat Error</div>
+          <div style={{fontSize:12,color:'var(--muted)',fontFamily:'var(--mono)',
+            background:'var(--surface)',padding:'8px 14px',borderRadius:8,maxWidth:300,wordBreak:'break-all'}}>
+            {(this.state.error as Error).message}
+          </div>
+          <button onClick={() => { this.setState({error:null}); this.props.onReset(); }}
+            style={{padding:'9px 24px',background:'var(--accent)',border:'none',borderRadius:9,
+              color:'#000',fontWeight:600,cursor:'pointer',fontSize:13}}>
+            Back to contacts
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { DEMO_CONTACTS, buildInitMsgs } from './constants/demo';
 import { DEFAULT_AI_KEY, AI_MODEL } from './constants/keys';
 import Landing from './components/screens/Landing';
@@ -123,7 +154,7 @@ export default function App() {
     if (!accountKey) return;
     const savedContacts = storage.getContacts(accountKey);
     if (savedContacts.length > 0) {
-      savedContacts.forEach(c => { c.address = c.address.toLowerCase(); });
+      savedContacts.forEach(c => { if (c && c.address) c.address = c.address.toLowerCase(); });
       const withAI = savedContacts.some(c => c.isAI) ? savedContacts : [AI_AGENT_CONTACT, ...savedContacts];
       setContacts(withAI);
     } else if (isDemo) {
@@ -331,6 +362,7 @@ export default function App() {
   }, [isDemo, handleMediaUploaded]);
 
   const selectContact = useCallback((c: Contact) => {
+    if (!c || !c.address) return;
     setActiveAndRef(c);
     const addr = normalizeAddress(c.address);
     setMsgs(p => p[addr] ? p : { ...p, [addr]: [] });
@@ -401,7 +433,7 @@ export default function App() {
         <div className={`sidebar-overlay${mobileSidebarOpen ? ' visible' : ''}`} onClick={() => setMobileSidebarOpen(false)} />
         <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
         <main className="chat-panel">
-          {active ? <ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} /> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
+          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
         </main>
       </div>
       {showProfile && <ProfileModal profile={{ ...profile, address: wallet?.address ?? null }} onClose={() => setShowProfile(false)} onSave={saveProfile} />}
