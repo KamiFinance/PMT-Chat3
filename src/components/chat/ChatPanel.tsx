@@ -1,4 +1,5 @@
 // @ts-nocheck
+import ProfilePic from '../ui/ProfilePic';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { uploadToPinata, getIpfsUrl } from '../../lib/pinata';
 
@@ -7,6 +8,7 @@ import Bubble from './Bubble';
 import AttachMenu from './AttachMenu';
 import MobileTopbar from '../ui/MobileTopbar';
 import BlockStrip from '../ui/BlockStrip';
+import SendModal from '../modals/SendModal';
 import { now, rndHash, uid, formatSize } from '../../lib/utils';
 export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded}){
   const [text,setText]=useState('');
@@ -75,7 +77,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
       if(true){
         uploadToPinata(file, file.name)
           .then(cid=>{
-            if(onMediaUploaded) onMediaUploaded(b64Data, cid, getIpfsUrl(cid));
+            if(onMediaUploaded) onMediaUploaded(msgId || b64Data.slice(0,20), cid, getIpfsUrl(cid));
           })
           .catch(err=>console.warn('[Pinata] upload failed, b64 fallback works fine'));
       }
@@ -217,7 +219,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
           </div>
         )}
         <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent2)',margin:'6px 0',opacity:.7}}>
-          🔗 E2E encryption handshake verified · block #{(BLOCK-50).toLocaleString()}
+          🔗 E2E encryption handshake verified · block #{currentBlock().toLocaleString()}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 8px',
           fontFamily:'var(--mono)',fontSize:10,color:'var(--muted)',letterSpacing:'1px'}}>
@@ -229,7 +231,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
         ))}
         <div ref={bottomRef}/>
       </div>
-      <BlockStrip blockNum={BLOCK} className="block-strip-bar"/>
+      <BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
       {/* Input */}
       <div className="chat-input-row" style={{padding:'12px 18px',borderTop:'1px solid var(--border)',background:'var(--panel)',
         display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>

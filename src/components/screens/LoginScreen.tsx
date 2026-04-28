@@ -25,7 +25,7 @@ export default function LoginScreen({onLogin,onBack}){
     try{
       const key='pmt_account_'+username.trim().toLowerCase();
       const stored=localStorage.getItem(key);
-      if(!stored)return setErr('Account not found. Check your username or create a new wallet.');
+      if(!stored){setLoading(false);return setErr('Account not found. Check your username or create a new wallet.');}
       const account=JSON.parse(stored);
       const ok=await PMTAuth.verifyPassword(password,account.passwordHash,account.passwordSalt);
       if(!ok)return setErr('Incorrect password. Please try again.');

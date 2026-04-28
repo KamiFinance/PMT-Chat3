@@ -1,4 +1,5 @@
 // @ts-nocheck
+import ProfilePic from '../ui/ProfilePic';
 import { REACTION_EMOJIS } from '../../constants/ai';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 

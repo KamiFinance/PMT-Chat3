@@ -1,4 +1,5 @@
 // @ts-nocheck
+import ProfilePic from '../ui/ProfilePic';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import Avatar from '../ui/Avatar';

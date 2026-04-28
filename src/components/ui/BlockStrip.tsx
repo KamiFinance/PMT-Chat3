@@ -1,10 +1,11 @@
 // @ts-nocheck
+import { currentBlock } from '../../lib/utils';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 
 export default function BlockStrip({blockNum,className}){
   const [blocks,setBlocks]=useState(()=>
-    Array.from({length:5},(_,i)=>({num:(blockNum||BLOCK)-i,txs:Math.floor(Math.random()*200)+50}))
+    Array.from({length:5},(_,i)=>({num:(blockNum||currentBlock())-i,txs:Math.floor(Math.random()*200)+50}))
   );
   useEffect(()=>{
     const id=setInterval(()=>setBlocks(p=>{
