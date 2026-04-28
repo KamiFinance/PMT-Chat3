@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ProfilePic from '../ui/ProfilePic';
 
 import Avatar from '../ui/Avatar';
 export default function VoiceBubble({msg,isOut,contact}){
