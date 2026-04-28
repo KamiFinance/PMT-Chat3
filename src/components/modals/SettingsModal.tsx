@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { storage } from '../../lib/storage';
 
 
 export default function SettingsModal({onClose,darkMode,onToggleTheme}){

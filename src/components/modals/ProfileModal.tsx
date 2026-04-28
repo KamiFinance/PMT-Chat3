@@ -23,7 +23,7 @@ export default function ProfileModal({profile,onClose,onSave}){
   };
 
   const save=()=>{
-    onSave({name:name.trim()||profile.name,bio:bio.trim(),avatarUrl:avatar});
+    onSave({name:name.trim()||profile.name,bio:bio.trim(),avatarUrl:avatar,address:profile.address});
     onClose();
   };
 
