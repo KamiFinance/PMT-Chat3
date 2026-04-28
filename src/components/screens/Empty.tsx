@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 
-export default function Empty({onNew}){
+export default function Empty({onNew, onOpenSidebar}){
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
       gap:14,padding:40,background:'var(--bg)'}}>

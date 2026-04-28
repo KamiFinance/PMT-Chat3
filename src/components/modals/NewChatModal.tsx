@@ -4,10 +4,25 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Avatar from '../ui/Avatar';
 export default function NewChatModal({onClose,onAdd}){
   const [addr,setAddr]=useState('');const[name,setName]=useState('');const[err,setErr]=useState(null);
+  const COLORS=['#a78bfa','#f59e0b','#34d399','#63d2ff','#f43f5e','#06b6d4'];
+  const BGS=['#1e1b30','#2a1f0a','#0a2a1f','#0a1f2a','#2a0a14','#0a2028'];
   const go=()=>{
     const t=addr.trim();
     if(!t)return setErr('Enter an address or ENS name');
-    onAdd({address:t,name:name.trim()||t});onClose();
+    const n=name.trim()||t;
+    const i=Math.floor(Math.random()*COLORS.length);
+    onAdd({
+      id:Date.now()+Math.random(),
+      address:t.toLowerCase(),
+      name:n,
+      avatar:n.slice(0,2).toUpperCase(),
+      color:COLORS[i],
+      bg:BGS[i],
+      online:false,
+      preview:'',
+      unread:0,
+    });
+    onClose();
   };
   return(
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}

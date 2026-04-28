@@ -53,7 +53,24 @@ export default function GroupChatModal({contacts,onClose,onCreate}){
           <button onClick={onClose}
             style={{flex:1,padding:10,background:'transparent',border:'1px solid var(--border)',
               borderRadius:9,color:'var(--text2)',fontSize:13.5,cursor:'pointer'}}>Cancel</button>
-          <button onClick={()=>{if(!name.trim()||selected.length<2)return;onCreate({name:name.trim(),memberIds:selected});onClose();}}
+          <button onClick={()=>{
+            if(!name.trim()||selected.length<2)return;
+            const n=name.trim();
+            onCreate({
+              id:'g'+Date.now(),
+              address:'group_'+Date.now(),
+              name:n,
+              avatar:n.slice(0,2).toUpperCase(),
+              color:'#a78bfa',
+              bg:'#1e1b30',
+              online:false,
+              isGroup:true,
+              members:selected,
+              preview:'Group created',
+              unread:0,
+            });
+            onClose();
+          }}
             disabled={!name.trim()||selected.length<2}
             style={{flex:2,padding:10,background:'var(--accent)',border:'none',borderRadius:9,
               color:'#0a0c14',fontWeight:600,fontSize:13.5,
