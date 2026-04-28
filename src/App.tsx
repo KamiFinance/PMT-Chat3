@@ -239,6 +239,36 @@ export default function App() {
     });
   }, [isDemo]);
 
+  // ── Send ETH/PMT ─────────────────────────────────────────────────────────────
+  const sendETH = useCallback(async (contact: Contact, amount: string): Promise<string | null> => {
+    const block = nextBlock();
+    const txId = uid();
+    const tx: Message = { id: txId, type: 'tx', out: true, amount, text: '', time: now(), block, confirms: 0, hash: rndHash(), pending: true };
+    const addr = normalizeAddress(contact.address);
+    setMsgs(p => ({ ...p, [addr]: [...(p[addr] ?? []), tx] }));
+    setContacts(p => p.map(c => c.id === contact.id ? { ...c, preview: `◈ Sent ${amount} PMT` } : c));
+
+    if (!isDemo && walletRef.current?.address && window.ethereum) {
+      try {
+        if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
+          throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
+        const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
+        const txHash = await (window.ethereum as any).request({
+          method: 'eth_sendTransaction',
+          params: [{ from: walletRef.current.address, to: addr, value: weiHex }],
+        }) as string;
+        setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).map(m => m.id === txId ? { ...m, hash: txHash, pending: false, confirms: 1 } : m) }));
+        return txHash;
+      } catch (e: any) {
+        setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).filter(m => m.id !== txId) }));
+        throw e;
+      }
+    } else {
+      setTimeout(() => setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).map(m => m.id === txId ? { ...m, confirms: 3, pending: false } : m) })), 2000);
+      return null;
+    }
+  }, [isDemo]);
+
   const sendMsg = useCallback(async (input: string | Partial<Message>) => {
     if (!activeRef.current) return;
     const isVoice = typeof input === 'object' && input.type === 'voice';
@@ -317,7 +347,26 @@ export default function App() {
   const handleDemo = useCallback(() => { setIsDemo(true); const w = { address: 'demo', balance: '2.847', network: 'PMT Chain', username: 'Demo' }; setWallet(w); walletRef.current = w; setScreen('chat'); }, []);
   const handleLogout = useCallback(() => { storage.clearSession(); setWallet(null); walletRef.current = null; setIsDemo(false); setContacts([]); setMsgs({}); setActiveAndRef(null); setScreen('landing'); }, [setActiveAndRef]);
 
-  if (screen === 'landing') return <Landing onDemo={handleDemo} onCreateWallet={() => setScreen('create')} onImportWallet={() => setScreen('import')} onLogin={() => setScreen('login')} onMetaMask={(w: Wallet) => { setWallet(w); walletRef.current = w; setScreen('metamask_setup'); }} />;
+  if (screen === 'landing') return <Landing onDemo={handleDemo} onCreateWallet={() => setScreen('create')} onImportWallet={() => setScreen('import')} onLogin={() => setScreen('login')} onMetaMask={(w: Wallet) => {
+              // Check if this wallet address already has a saved account
+              const savedAcct = localStorage.getItem(`pmt_account_${w.address.toLowerCase()}`);
+              if (savedAcct) {
+                // Returning user — load their username and go straight to chat
+                try {
+                  const acct = JSON.parse(savedAcct);
+                  const fullWallet = { ...w, username: acct.username };
+                  setWallet(fullWallet);
+                  walletRef.current = fullWallet;
+                  localStorage.setItem('pmt_session', JSON.stringify({ username: acct.username, address: w.address }));
+                  setScreen('chat');
+                } catch {
+                  setWallet(w); walletRef.current = w; setScreen('metamask_setup');
+                }
+              } else {
+                // New user — needs to create username/password
+                setWallet(w); walletRef.current = w; setScreen('metamask_setup');
+              }
+            }} />;
   if (screen === 'create') return <CreateWalletFlow onWallet={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'import') return <ImportWalletFlow onWallet={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'login') return <LoginScreen onLogin={handleWallet} onBack={() => setScreen('landing')} />;
