@@ -25,12 +25,18 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     }
     // Fallback: providers array (MetaMask + TronLink coexistence)
     if(window.ethereum?.providers?.length){
+      // Prefer MetaMask, avoid TronLink
       const mm=window.ethereum.providers.find(p=>p.isMetaMask&&!p.isTronLink);
       if(mm)return mm;
+      // MetaMask may not have isTronLink set at all — just pick the MetaMask one
+      const mmAny=window.ethereum.providers.find(p=>p.isMetaMask);
+      if(mmAny)return mmAny;
       const other=window.ethereum.providers.find(p=>!p.isTronLink);
       if(other)return other;
     }
-    // Single provider - skip TronLink
+    // Single provider — if both flags set, it means TronLink injected but real MetaMask is available
+    // Try to use it anyway if it has isMetaMask
+    if(window.ethereum?.isMetaMask)return window.ethereum;
     if(window.ethereum&&!window.ethereum.isTronLink)return window.ethereum;
     return null;
   };
