@@ -10,7 +10,7 @@ import MobileTopbar from '../ui/MobileTopbar';
 import BlockStrip from '../ui/BlockStrip';
 import SendModal from '../modals/SendModal';
 import { now, rndHash, uid, formatSize } from '../../lib/utils';
-export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded}){
+export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);
   const [showAttach,setShowAttach]=useState(false);
@@ -64,23 +64,26 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
     const reader=new FileReader();
     reader.onloadend=()=>{
       const b64Data=reader.result; // data:<mime>;base64,<data>
+      const msgId='m'+Date.now();
       // Send immediately with b64Data embedded — inbox delivery works right away
       onSend({
         type:msgType,
         fileUrl:localUrl,
         b64Data,
+        mediaMsgId:msgId,
+        imgMsgId:msgId,
         fileName:file.name,
         fileSize:formatSize(file.size),
         mimeType:file.type,
       });
       // Upload to Pinata in background — upgrades to IPFS CID when done
-      if(true){
-        uploadToPinata(file, file.name)
-          .then(cid=>{
-            if(onMediaUploaded) onMediaUploaded(msgId || b64Data.slice(0,20), cid, getIpfsUrl(cid));
-          })
-          .catch(err=>console.warn('[Pinata] upload failed, b64 fallback works fine'));
-      }
+      uploadToPinata(file, file.name)
+        .then(cid=>{
+          if(onMediaUploaded) onMediaUploaded(msgId, cid, getIpfsUrl(cid));
+        })
+        .catch(()=>{
+          if(onMediaUploaded) onMediaUploaded(msgId, null, null, b64Data);
+        });
     };
     reader.readAsDataURL(file);
     e.target.value='';

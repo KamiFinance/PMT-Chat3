@@ -85,7 +85,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
                   border:'1px solid rgba(167,139,250,.3)',borderRadius:4,padding:'0 4px',color:'var(--accent2)'}}>GROUP</span>}
                 <div style={{fontSize:13,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.name}</div>
               </div>
-              <div style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.preview||shortAddr(c.address)}</div>
+              <div style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.preview||shortAddress(c.address)}</div>
             </div>
             {c.unread>0&&(
               <div style={{minWidth:18,height:18,borderRadius:9,background:'var(--accent)',
