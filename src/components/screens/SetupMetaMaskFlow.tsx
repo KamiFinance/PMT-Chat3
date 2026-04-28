@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const now = () => new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+import Avatar from '../ui/Avatar';
 export default function SetupMetaMaskFlow({wallet,onDone,onSkip}){
   const [username,setUsername]=useState('');
   const [pwd,setPwd]=useState('');

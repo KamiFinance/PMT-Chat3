@@ -1,8 +1,8 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ProfilePic from '../ui/ProfilePic';
-import Avatar from '../ui/Avatar';
 
+import Avatar from '../ui/Avatar';
+import ProfilePic from '../ui/ProfilePic';
 export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onProfile,onSettings,onWallet,onLogout,wallet,isDemo,profile,onEditContact,onSearch,mobileOpen,onMobileClose}){
   const [q,setQ]=useState('');
   const filtered=contacts.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())||c.address.includes(q));

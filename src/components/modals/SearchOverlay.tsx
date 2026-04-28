@@ -1,8 +1,8 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ProfilePic from '../ui/ProfilePic';
-import HighlightText from '../ui/HighlightText';
 
+import Avatar from '../ui/Avatar';
+import HighlightText from '../ui/HighlightText';
 export default function SearchOverlay({contacts,msgs,onClose,onNavigate}){
   const [q,setQ]=useState('');
   const inputRef=useRef(null);

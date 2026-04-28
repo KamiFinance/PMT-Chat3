@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from './Avatar';
 export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo,profile}){
   if(contact){
     return(

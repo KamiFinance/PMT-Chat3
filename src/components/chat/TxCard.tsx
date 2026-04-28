@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+
 export default function TxCard({msg,isOut}){
   return(
     <div style={{animation:'fadeIn .2s ease',background:'var(--surface)',border:'1px solid rgba(167,139,250,.25)',

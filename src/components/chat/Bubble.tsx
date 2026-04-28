@@ -1,13 +1,14 @@
 // @ts-nocheck
+import { REACTION_EMOJIS } from '../../constants/ai';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+import Avatar from '../ui/Avatar';
+import TxCard from './TxCard';
 import VoiceBubble from './VoiceBubble';
 import ImageBubble from './ImageBubble';
 import FileBubble from './FileBubble';
-import TxCard from './TxCard';
-import ProfilePic from '../ui/ProfilePic';
+import ReactionPicker from './ReactionPicker';
 import HighlightText from '../ui/HighlightText';
-const REACTION_EMOJIS = ['👍','❤️','😂','😮','🔥','✅'];
-
 export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
   const [showPicker,setShowPicker]=useState(false);
   const reactions=msg.reactions||{};

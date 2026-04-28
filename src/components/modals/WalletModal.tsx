@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import QRInline from '../ui/QRInline';
 
+import QRInline from '../ui/QRInline';
 export default function WalletModal({wallet,isDemo,onClose}){
   const [tokens,setTokens]=useState([]);
   const [loading,setLoading]=useState(true);

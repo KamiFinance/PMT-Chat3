@@ -1,7 +1,9 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PMTCrypto } from '../../lib/crypto';
+import { PMTAuth } from '../../lib/auth';
 
-const now = () => new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
 export default function ImportWalletFlow({onWallet,onBack}){
   const [step,setStep]=useState('choose'); // choose | enter | account
   const [mode,setMode]=useState('seed');
@@ -19,7 +21,7 @@ export default function ImportWalletFlow({onWallet,onBack}){
   const verifyImport=async()=>{
     setErr(null);setLoading(true);
     try{
-      const C=window.PMTCrypto;
+      const C=PMTCrypto;
       let w;
       if(mode==='seed'){
         const phrase=input.trim().toLowerCase();
@@ -49,8 +51,8 @@ export default function ImportWalletFlow({onWallet,onBack}){
         privateKey:importedWallet.privateKey,
         mnemonic:importedWallet.mnemonic||null,
       };
-      const encrypted=await window.PMTAuth.encryptWallet(walletData,password);
-      const {hash,salt}=await window.PMTAuth.hashPassword(password);
+      const encrypted=await PMTAuth.encryptWallet(walletData,password);
+      const {hash,salt}=await PMTAuth.hashPassword(password);
       const account={
         username:username.trim(),
         address:importedWallet.address,

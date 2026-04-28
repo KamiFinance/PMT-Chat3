@@ -1,8 +1,9 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+
 export default function SettingsModal({onClose,darkMode,onToggleTheme}){
-  const [pinataJwt,setPinataJwt]=useState(''||'');
+  const [pinataJwt,setPinataJwt]=useState(storage.getPinataJwt()||'');
   const [aiKey,setAiKey]=useState(localStorage.getItem('pmt_anthropic_key')||'');
   const [saved,setSaved]=useState(false);
 

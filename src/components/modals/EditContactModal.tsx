@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from '../ui/Avatar';
 export default function EditContactModal({contact,onClose,onSave,onDelete}){
   const [name,setName]=useState(contact.name||'');
   const [address,setAddress]=useState(contact.address||'');

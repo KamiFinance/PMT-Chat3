@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-let BLOCK = 18403100 + Math.floor(Math.random()*500);
+
 export default function BlockStrip({blockNum,className}){
   const [blocks,setBlocks]=useState(()=>
     Array.from({length:5},(_,i)=>({num:(blockNum||BLOCK)-i,txs:Math.floor(Math.random()*200)+50}))

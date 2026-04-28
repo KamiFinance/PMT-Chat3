@@ -1,18 +1,19 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from '../ui/Avatar';
 export default function FileBubble({msg,isOut,contact}){
   const ext=(msg.fileName||'').split('.').pop().toUpperCase().slice(0,4)||'FILE';
   // Reconstruct fileUrl from IPFS CID or stored data (survives logout)
   const [fileUrl,setFileUrl]=useState(msg.fileUrl||null);
   useEffect(()=>{
     if(fileUrl)return;
-    if(msg.ipfsCid){setFileUrl(((cid: string) => `https://gateway.pinata.cloud/ipfs/${cid}`)(msg.ipfsCid)||('https://gateway.pinata.cloud/ipfs/'+msg.ipfsCid));return;}
+    if(msg.ipfsCid){setFileUrl(getIpfsUrl(msg.ipfsCid)||('https://gateway.pinata.cloud/ipfs/'+msg.ipfsCid));return;}
     if(msg.b64Data){setFileUrl(msg.b64Data);return;}
     if(msg.b64Fallback){setFileUrl(msg.b64Fallback);return;}
     if(msg.imgData){setFileUrl(msg.imgData);return;}
     const sk=msg.mediaMsgId?'pmt_media_'+msg.mediaMsgId:msg.imgMsgId?'pmt_media_'+msg.imgMsgId:null;
-    if(sk){try{const s=localStorage.getItem(sk)||localStorage.getItem(sk.replace('pmt_media_','pmt_img_'));if(s){try{const p=JSON.parse(s);setFileUrl(p.ipfsUrl||(p.cid?((cid: string) => `https://gateway.pinata.cloud/ipfs/${cid}`)(p.cid):null)||s);}catch{setFileUrl(s);}}}catch{}}
+    if(sk){try{const s=localStorage.getItem(sk)||localStorage.getItem(sk.replace('pmt_media_','pmt_img_'));if(s){try{const p=JSON.parse(s);setFileUrl(p.ipfsUrl||(p.cid?getIpfsUrl(p.cid):null)||s);}catch{setFileUrl(s);}}}catch{}}
   },[msg.mediaMsgId,msg.imgMsgId,msg.ipfsCid,msg.b64Data,msg.b64Fallback]);
   const extColors={
     PDF:'#f87171',DOC:'#60a5fa',DOCX:'#60a5fa',XLS:'#34d399',XLSX:'#34d399',

@@ -1,7 +1,9 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PMTCrypto } from '../../lib/crypto';
+import { PMTAuth } from '../../lib/auth';
 
-const now = () => new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
 export default function CreateWalletFlow({onWallet,onBack}){
   const [step,setStep]=useState('generate'); // generate | backup | verify | password
   const [wallet,setWallet]=useState(null);
@@ -16,7 +18,7 @@ export default function CreateWalletFlow({onWallet,onBack}){
 
   useEffect(()=>{
     // Generate wallet using PMTCrypto
-    window.PMTCrypto.createWallet().then(w=>{
+    PMTCrypto.createWallet().then(w=>{
       setWallet({
         address:w.address,
         privateKey:w.privateKey,
@@ -55,9 +57,9 @@ export default function CreateWalletFlow({onWallet,onBack}){
     try{
       const walletData={address:wallet.address,privateKey:wallet.privateKey,mnemonic:wallet.mnemonic};
       // Encrypt wallet with password
-      const encrypted=await window.PMTAuth.encryptWallet(walletData,password);
+      const encrypted=await PMTAuth.encryptWallet(walletData,password);
       // Hash password for login verification
-      const {hash,salt}=await window.PMTAuth.hashPassword(password);
+      const {hash,salt}=await PMTAuth.hashPassword(password);
       const account={
         username:username.trim(),
         address:wallet.address,

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ProfilePic from '../ui/ProfilePic';
 
+import ProfilePic from '../ui/ProfilePic';
 export default function ProfileModal({profile,onClose,onSave}){
   const [name,setName]=useState(profile.name||'');
   const [bio,setBio]=useState(profile.bio||'');

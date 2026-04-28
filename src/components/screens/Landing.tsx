@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-declare global { interface Window { __eip6963Providers?: any[]; ethereum?: any; } }
+
 
 export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet,onLogin}){
   const [connecting,setConnecting]=useState(false);

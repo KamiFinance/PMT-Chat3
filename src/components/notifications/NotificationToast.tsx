@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from '../ui/Avatar';
 export default function NotificationToast({notifs,onDismiss,onSelect}){
   return(
     <div className="notif-wrap" style={{position:'fixed',top:16,right:16,zIndex:9999,display:'flex',flexDirection:'column',gap:8,pointerEvents:'none'}}>

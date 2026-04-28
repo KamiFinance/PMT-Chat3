@@ -1,14 +1,13 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { uploadToPinata, getIpfsUrl } from '../../lib/pinata';
 
-const now = () => new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-let BLOCK = 18403100 + Math.floor(Math.random()*500);
-const formatSize=(b:number)=>b<1024?`${b}B`:b<1024*1024?`${(b/1024).toFixed(1)}KB`:`${(b/1024/1024).toFixed(1)}MB`;
+import Avatar from '../ui/Avatar';
 import Bubble from './Bubble';
 import AttachMenu from './AttachMenu';
 import MobileTopbar from '../ui/MobileTopbar';
 import BlockStrip from '../ui/BlockStrip';
-declare global { interface Window { PMTPinata?: any; webkitAudioContext?: typeof AudioContext; } }
+import { now, rndHash, uid, formatSize } from '../../lib/utils';
 export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);
@@ -74,9 +73,9 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
       });
       // Upload to Pinata in background — upgrades to IPFS CID when done
       if(true){
-        window.PMTPinata.uploadFile(file,file.name)
+        uploadToPinata(file, file.name)
           .then(cid=>{
-            if(onMediaUploaded) onMediaUploaded(b64Data, cid, window.PMTPinata.getUrl(cid));
+            if(onMediaUploaded) onMediaUploaded(b64Data, cid, getIpfsUrl(cid));
           })
           .catch(err=>console.warn('[Pinata] upload failed, b64 fallback works fine'));
       }
@@ -127,9 +126,9 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
 
           if(true){
             // Upload to IPFS for cross-device delivery
-            window.PMTPinata.uploadFile(blob, 'voice_'+msgId+'.webm')
+            uploadToPinata(blob, 'voice_'+msgId+'.webm')
               .then(cid=>{
-                const ipfsUrl=window.PMTPinata.getUrl(cid);
+                const ipfsUrl=getIpfsUrl(cid);
                 onSendRef.current({type:'voice',audioUrl:url,audioMsgId:msgId,ipfsCid:cid,ipfsUrl,duration:dur,waveform:bars});
               })
               .catch(()=>{

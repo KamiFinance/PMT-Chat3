@@ -1,5 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PMTAuth } from '../../lib/auth';
+
 
 export default function LoginScreen({onLogin,onBack}){
   const [username,setUsername]=useState('');
@@ -25,10 +27,10 @@ export default function LoginScreen({onLogin,onBack}){
       const stored=localStorage.getItem(key);
       if(!stored)return setErr('Account not found. Check your username or create a new wallet.');
       const account=JSON.parse(stored);
-      const ok=await window.PMTAuth.verifyPassword(password,account.passwordHash,account.passwordSalt);
+      const ok=await PMTAuth.verifyPassword(password,account.passwordHash,account.passwordSalt);
       if(!ok)return setErr('Incorrect password. Please try again.');
       // Decrypt wallet
-      const walletData=await window.PMTAuth.decryptWallet(account.encryptedWallet,password);
+      const walletData=await PMTAuth.decryptWallet(account.encryptedWallet,password);
       localStorage.setItem('pmt_session',JSON.stringify({username:account.username,address:account.address}));
       onLogin({address:walletData.address,privateKey:walletData.privateKey,
         balance:'0.0000',network:'PMT Chain',username:account.username});

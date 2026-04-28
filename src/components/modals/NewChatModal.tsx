@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from '../ui/Avatar';
 export default function NewChatModal({onClose,onAdd}){
   const [addr,setAddr]=useState('');const[name,setName]=useState('');const[err,setErr]=useState(null);
   const go=()=>{

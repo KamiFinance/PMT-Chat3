@@ -14,3 +14,5 @@ export const AI_AGENT_CONTACT: Contact = {
   preview: 'Ask me anything...',
   unread: 0,
 };
+
+export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '🔥', '✅'];

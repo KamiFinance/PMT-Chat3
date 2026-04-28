@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+
 export default function Avatar({name,color,bg,online,size=38,fs=13}){
   return(
     <div style={{width:size,height:size,borderRadius:'50%',background:bg||'#1e2438',color:color||'var(--accent)',

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from '../ui/Avatar';
 export default function VoiceBubble({msg,isOut,contact}){
   const [playing,setPlaying]=useState(false);
   const [progress,setProgress]=useState(0);
@@ -12,7 +13,7 @@ export default function VoiceBubble({msg,isOut,contact}){
     if(audioUrl)return;
     // Try IPFS first
     if(msg.ipfsCid){
-      setAudioUrl(((cid: string) => `https://gateway.pinata.cloud/ipfs/${cid}`)(msg.ipfsCid)||('https://ipfs.io/ipfs/'+msg.ipfsCid));
+      setAudioUrl(getIpfsUrl(msg.ipfsCid)||('https://ipfs.io/ipfs/'+msg.ipfsCid));
       return;
     }
     if(msg.ipfsUrl){ setAudioUrl(msg.ipfsUrl); return; }

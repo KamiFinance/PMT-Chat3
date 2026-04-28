@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+import Avatar from '../ui/Avatar';
 export default function GroupChatModal({contacts,onClose,onCreate}){
   const [name,setName]=useState('');
   const [selected,setSelected]=useState([]);
