@@ -1,0 +1,189 @@
+import { useEffect, useCallback } from 'react';
+import type { Wallet, Contact, MsgsMap, Message, InboxMessage } from '../types';
+import { STORAGE_KEYS } from '../types';
+import { storage } from '../lib/storage';
+import { getIpfsUrl } from '../lib/pinata';
+import { now, rndHash, uid, normalizeAddress } from '../lib/utils';
+
+interface UseInboxPollParams {
+  wallet: Wallet | null;
+  isDemo: boolean;
+  setMsgs: React.Dispatch<React.SetStateAction<MsgsMap>>;
+  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
+  pushNotif: (contact: Contact, text: string) => void;
+}
+
+function reconstructVoiceMsg(inboxMsg: InboxMessage): Partial<Message> {
+  let audioUrl: string | null = null;
+  if (inboxMsg.ipfsCid) {
+    audioUrl = getIpfsUrl(inboxMsg.ipfsCid);
+  } else if (inboxMsg.ipfsUrl) {
+    audioUrl = inboxMsg.ipfsUrl;
+  } else if (inboxMsg.audioMsgId) {
+    try {
+      const b64 = storage.getAudio(inboxMsg.audioMsgId);
+      if (b64) {
+        const mime = b64.split(';')[0].split(':')[1] || 'audio/webm';
+        const dec = atob(b64.split(',')[1]);
+        const bytes = new Uint8Array(dec.length);
+        for (let i = 0; i < dec.length; i++) bytes[i] = dec.charCodeAt(i);
+        audioUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      }
+    } catch { /* ignore */ }
+  }
+  return {
+    duration: inboxMsg.duration ?? 0,
+    waveform: inboxMsg.waveform ?? [],
+    audioUrl,
+    ipfsCid: inboxMsg.ipfsCid,
+    ipfsUrl: inboxMsg.ipfsUrl,
+  };
+}
+
+function reconstructMediaMsg(inboxMsg: InboxMessage): Partial<Message> {
+  const ipfsCid = inboxMsg.ipfsCid ?? null;
+  const rawData = inboxMsg.b64Data ?? inboxMsg.imgData ?? inboxMsg.fileData ?? null;
+  let fileUrl: string | null = null;
+
+  if (ipfsCid) {
+    fileUrl = getIpfsUrl(ipfsCid);
+  } else if (rawData) {
+    // Store for persistence
+    const mediaKey = inboxMsg.mediaMsgId ?? inboxMsg.imgMsgId;
+    if (mediaKey) storage.setMedia(mediaKey, rawData);
+    fileUrl = rawData;
+  }
+
+  return {
+    fileUrl,
+    ipfsCid: ipfsCid ?? undefined,
+    b64Data: rawData ?? undefined,
+    mediaMsgId: inboxMsg.mediaMsgId,
+    imgMsgId: inboxMsg.imgMsgId,
+    fileName: inboxMsg.fileName,
+    fileSize: inboxMsg.fileSize,
+    mimeType: inboxMsg.mimeType,
+  };
+}
+
+export function useInboxPoll({
+  wallet,
+  isDemo,
+  setMsgs,
+  setContacts,
+  pushNotif,
+}: UseInboxPollParams) {
+  const COLORS = ['#a78bfa', '#f59e0b', '#34d399', '#63d2ff', '#f43f5e', '#06b6d4'];
+  const BGS    = ['#1e1b30', '#2a1f0a', '#0a2a1f', '#0a1f2a', '#2a0a14', '#0a2028'];
+
+  const previewText = (msg: InboxMessage) => {
+    if (msg.type === 'voice') return '🎙 Voice message';
+    if (msg.type === 'image') return '🖼 Image';
+    if (msg.type === 'file')  return `📄 ${msg.fileName ?? 'File'}`;
+    return msg.text;
+  };
+
+  const processInbox = useCallback(() => {
+    if (!wallet?.address) return;
+    const inboxKey = STORAGE_KEYS.inbox(wallet.address);
+
+    try {
+      const raw = localStorage.getItem(inboxKey);
+      if (!raw) return;
+      const incoming: InboxMessage[] = JSON.parse(raw);
+      if (!incoming.length) return;
+
+      // Clear inbox immediately to prevent reprocessing
+      localStorage.removeItem(inboxKey);
+
+      incoming.forEach(inboxMsg => {
+        const senderAddr = normalizeAddress(inboxMsg.from ?? '');
+        if (!senderAddr) return;
+
+        // ── Reaction ──────────────────────────────────────────────────────
+        if (inboxMsg.type === 'reaction') {
+          setMsgs(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(addr => {
+              updated[addr] = (updated[addr] ?? []).map(m => {
+                if (m.id !== inboxMsg.msgId) return m;
+                const reactions = { ...(m.reactions ?? {}) };
+                const emoji = inboxMsg.emoji ?? '';
+                reactions[emoji] = (reactions[emoji] ?? 0) === 1 ? 0 : 1;
+                return { ...m, reactions };
+              });
+            });
+            return updated;
+          });
+          return;
+        }
+
+        // ── Build new message ──────────────────────────────────────────────
+        const base: Message = {
+          id: inboxMsg.id || uid(),
+          out: false,
+          type: inboxMsg.type as Message['type'],
+          text: inboxMsg.text,
+          time: inboxMsg.time ?? now(),
+          block: 0, // will be incremented
+          confirms: 3,
+          hash: inboxMsg.hash ?? rndHash(),
+          read: false,
+          onChain: !!(inboxMsg.chain || inboxMsg.onChain),
+          chain: inboxMsg.chain ?? 'pmt',
+        };
+
+        let extra: Partial<Message> = {};
+        if (inboxMsg.type === 'voice') extra = reconstructVoiceMsg(inboxMsg);
+        if (inboxMsg.type === 'image' || inboxMsg.type === 'file') extra = reconstructMediaMsg(inboxMsg);
+
+        const newMsg: Message = { ...base, ...extra };
+
+        // Auto-add sender as contact
+        setContacts(prev => {
+          const exists = prev.find(c => normalizeAddress(c.address) === senderAddr);
+          let updated = prev;
+
+          if (!exists) {
+            const i = prev.length % COLORS.length;
+            const name = inboxMsg.fromName ?? `${senderAddr.slice(0, 8)}...`;
+            updated = [{
+              id: Date.now() + Math.random(),
+              address: senderAddr,
+              name,
+              avatar: name.slice(0, 2).toUpperCase(),
+              color: COLORS[i],
+              bg: BGS[i],
+              online: true,
+              preview: previewText(inboxMsg),
+              unread: 1,
+            } as Contact, ...prev];
+          } else {
+            updated = prev.map(c =>
+              normalizeAddress(c.address) === senderAddr
+                ? { ...c, preview: previewText(inboxMsg), unread: (c.unread ?? 0) + 1 }
+                : c
+            );
+          }
+
+          // Show notification
+          const sender = updated.find(c => normalizeAddress(c.address) === senderAddr);
+          if (sender) pushNotif(sender, previewText(inboxMsg));
+
+          return updated;
+        });
+
+        setMsgs(prev => ({
+          ...prev,
+          [senderAddr]: [...(prev[senderAddr] ?? []), newMsg],
+        }));
+      });
+    } catch { /* ignore poll errors */ }
+  }, [wallet?.address, setMsgs, setContacts, pushNotif]);
+
+  useEffect(() => {
+    if (!wallet?.address || isDemo) return;
+    const interval = setInterval(processInbox, 2000);
+    return () => clearInterval(interval);
+  }, [wallet?.address, isDemo, processInbox]);
+}
