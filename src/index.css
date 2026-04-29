@@ -94,7 +94,7 @@ input,textarea,select{font-size:16px!important}
   .qr-btn{display:none!important}
 
   /* Chat panel height: account for mobile keyboard and safe areas */
-  .chat-panel{height:100dvh;padding-bottom:var(--safe-bottom)}
+  .chat-panel{height:100dvh;padding-bottom:0}
 
   /* Message area padding adjustment */
   .chat-messages{padding-bottom:calc(60px + var(--safe-bottom))!important}

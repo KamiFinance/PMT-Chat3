@@ -266,54 +266,57 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
     recordSecondsRef.current=0;
   };
   return(
-    <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}>
-      {/* Mobile topbar — shown only on mobile via CSS */}
+    <>
+      {/* Mobile topbar */}
       <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
 
-      {/* Single scroll container — header + messages + blockstrip + input all inside.
-          Sticky header/input stay visible. Scroll events hit this div wherever the mouse is. */}
-      <div ref={messagesRef} className="chat-messages"
-        style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',minHeight:0,height:0}}>
+      {/* ONE scroll container = the entire chat area.
+          Header + input are sticky inside it → wheel anywhere in the chat scrolls messages. */}
+      <div ref={messagesRef}
+        style={{flex:1,overflowY:'auto',overflowX:'hidden',display:'flex',
+          flexDirection:'column',minHeight:0,background:'var(--bg)'}}>
 
-        {/* ── Sticky header ── */}
+        {/* ── Sticky header ─────────────────────────────────────────── */}
         <div className="desktop-topbar"
           style={{position:'sticky',top:0,zIndex:10,padding:'12px 18px',
             borderBottom:'1px solid var(--border)',background:'var(--panel)',
             display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
           <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
-            color={contact.isGroup?'var(--accent2)':contact.color} bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
+            color={contact.isGroup?'var(--accent2)':contact.color}
+            bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:600}}>{contact.name}</div>
             <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',opacity:.8,
               whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {contact.isGroup
-                ? `${contact.members?.length||0} members · PMT Chain`
-                : contact.address}
+              {contact.isGroup?`${contact.members?.length||0} members · PMT Chain`:contact.address}
             </div>
           </div>
-          <div className="chain-badge" style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',
-            background:'rgba(99,210,255,.07)',border:'1px solid rgba(99,210,255,.18)',
-            borderRadius:20,fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',flexShrink:0}}>
+          <div className="chain-badge" style={{display:'flex',alignItems:'center',gap:5,
+            padding:'5px 10px',background:'rgba(99,210,255,.07)',
+            border:'1px solid rgba(99,210,255,.18)',borderRadius:20,
+            fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',flexShrink:0}}>
             <div style={{width:6,height:6,borderRadius:'50%',background:'var(--accent3)',animation:'pulse 2s infinite'}}/>
             PMT Chain
           </div>
           {!contact.isGroup&&(
-            <button onClick={()=>setShowSend(true)}
-              style={{padding:'5px 10px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
-                color:'var(--text2)',fontSize:12,cursor:'pointer',flexShrink:0}}>↑ PMT</button>
+            <button className="qr-btn" onClick={()=>setShowSend(true)}
+              style={{padding:'5px 10px',background:'var(--surface)',border:'1px solid var(--border)',
+                borderRadius:8,color:'var(--text2)',fontSize:12,cursor:'pointer',flexShrink:0}}>↑ PMT</button>
           )}
         </div>
 
-        {/* ── Message list ── */}
-        <div style={{flex:1,padding:'16px 20px',display:'flex',flexDirection:'column',gap:2}}>
+        {/* ── Message list ─────────────────────────────────────────── */}
+        <div className="chat-messages" style={{flex:1,padding:'16px 20px',
+          display:'flex',flexDirection:'column',gap:2}}>
           {searchQuery&&(
             <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',
-              margin:'4px 0 8px',background:'rgba(250,255,99,.08)',border:'1px solid rgba(250,255,99,.2)',
-              borderRadius:8,padding:'5px 12px'}}>
+              margin:'4px 0 8px',background:'rgba(250,255,99,.08)',
+              border:'1px solid rgba(250,255,99,.2)',borderRadius:8,padding:'5px 12px'}}>
               Showing results for "{searchQuery}"
             </div>
           )}
-          <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent2)',margin:'6px 0',opacity:.7}}>
+          <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,
+            color:'var(--accent2)',margin:'6px 0',opacity:.7}}>
             🔗 E2E encryption handshake verified · block #{currentBlock().toLocaleString()}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 8px',
@@ -322,26 +325,27 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
             <div style={{flex:1,height:1,background:'var(--border)'}}/>
           </div>
           {messages.map(m=>(
-            <Bubble key={m.id} msg={m} isOut={m.out} contact={contact} onReact={onReact} searchQuery={searchQuery}/>
+            <Bubble key={m.id} msg={m} isOut={m.out} contact={contact}
+              onReact={onReact} searchQuery={searchQuery}/>
           ))}
           <div ref={bottomRef}/>
         </div>
 
-        {/* ── Sticky block strip ── */}
+        {/* ── Sticky block strip ────────────────────────────────────── */}
         <div style={{position:'sticky',bottom:70,zIndex:5,flexShrink:0}}>
           <BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
         </div>
 
-        {/* ── Sticky input ── */}
+        {/* ── Sticky input ─────────────────────────────────────────── */}
         <div className="chat-input-row"
           style={{position:'sticky',bottom:0,zIndex:10,padding:'12px 18px',
             borderTop:'1px solid var(--border)',background:'var(--panel)',
             display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
           {recorderError&&(
-            <div style={{fontSize:11,color:'var(--danger)',fontFamily:'var(--mono)',textAlign:'center'}}>{recorderError}</div>
+            <div style={{fontSize:11,color:'var(--danger)',fontFamily:'var(--mono)',
+              textAlign:'center'}}>{recorderError}</div>
           )}
           {recording?(
-            /* Recording UI */
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <button onClick={cancelRecording}
                 style={{width:38,height:38,background:'var(--surface)',border:'1px solid var(--border)',
@@ -362,7 +366,6 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
                   justifyContent:'center',flexShrink:0,cursor:'pointer'}}>■</button>
             </div>
           ):(
-            /* Normal input UI */
             <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
               <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileChosen}/>
               <div style={{position:'relative'}}>
@@ -387,13 +390,16 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
                 </button>
                 {showEmoji&&<EmojiPicker onSelect={e=>{insertEmoji(e);}} onClose={()=>setShowEmoji(false)}/>}
               </div>
-              <div style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
-                display:'flex',alignItems:'flex-end',padding:'0 12px'}}>
-                <textarea ref={inputRef} rows={1} value={text} onChange={e=>setText(e.target.value)} onKeyDown={key}
+              <div style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',
+                borderRadius:12,display:'flex',alignItems:'flex-end',padding:'0 12px'}}>
+                <textarea ref={inputRef} rows={1} value={text}
+                  onChange={e=>setText(e.target.value)} onKeyDown={key}
                   placeholder={`Message ${contact.name} (encrypted on-chain)...`}
-                  style={{flex:1,background:'transparent',border:'none',outline:'none',color:'var(--text)',
-                    fontFamily:'var(--sans)',fontSize:13.5,padding:'10px 0',resize:'none',lineHeight:1.5,maxHeight:120}}/>
-                <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',opacity:.6,paddingBottom:11}}>🔒 E2E</span>
+                  style={{flex:1,background:'transparent',border:'none',outline:'none',
+                    color:'var(--text)',fontFamily:'var(--sans)',fontSize:13.5,
+                    padding:'10px 0',resize:'none',lineHeight:1.5,maxHeight:120}}/>
+                <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',
+                  opacity:.6,paddingBottom:11}}>🔒 E2E</span>
               </div>
               {text.trim()?(
                 <button onClick={send}
@@ -412,7 +418,8 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
         </div>
       </div>
 
-      {showSend&&<SendModal contact={contact} onClose={()=>setShowSend(false)} onSend={amt=>onSendETH(contact,amt)} isDemo={isDemo}/>}
-    </div>
+      {showSend&&<SendModal contact={contact} onClose={()=>setShowSend(false)}
+        onSend={amt=>onSendETH(contact,amt)} isDemo={isDemo}/>}
+    </>
   );
 }
