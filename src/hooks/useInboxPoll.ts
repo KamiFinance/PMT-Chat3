@@ -175,6 +175,7 @@ export function useInboxPoll({
               address: senderAddr,
               name,
               avatar: name.slice(0, 2).toUpperCase(),
+              avatarUrl: senderAvatarUrl || null,
               color: COLORS[i],
               bg: BGS[i],
               online: true,
@@ -184,7 +185,8 @@ export function useInboxPoll({
           } else {
             updated = prev.map(c =>
               normalizeAddress(c.address) === senderAddr
-                ? { ...c, preview: previewText(inboxMsg), unread: (c.unread ?? 0) + 1 }
+                ? { ...c, preview: previewText(inboxMsg), unread: (c.unread ?? 0) + 1,
+                    ...(senderAvatarUrl ? { avatarUrl: senderAvatarUrl } : {}) }
                 : c
             );
           }
