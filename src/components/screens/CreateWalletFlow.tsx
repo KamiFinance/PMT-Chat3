@@ -3,6 +3,7 @@ import { now } from "../../lib/utils";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PMTCrypto } from '../../lib/crypto';
 import { PMTAuth } from '../../lib/auth';
+import { saveCloudBackup, checkUsernameAvailable } from '../../lib/cloudBackup';
 
 
 export default function CreateWalletFlow({onWallet,onBack}){
@@ -13,6 +14,8 @@ export default function CreateWalletFlow({onWallet,onBack}){
   const [checkIdxs,setCheckIdxs]=useState([]);
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
+  const [cloudStatus,setCloudStatus]=useState(''); // '', 'saving', 'saved', 'error'
+  const [usernameAvail,setUsernameAvail]=useState<boolean|null>(null);
   const [confirmPwd,setConfirmPwd]=useState('');
   const [pwdErr,setPwdErr]=useState(null);
   const [copied,setCopied]=useState(false);
@@ -53,6 +56,11 @@ export default function CreateWalletFlow({onWallet,onBack}){
     if(username.trim().length<3)return setPwdErr('Username must be at least 3 characters');
     if(password.length<8)return setPwdErr('Password must be at least 8 characters');
     if(password!==confirmPwd)return setPwdErr('Passwords do not match');
+    // Check username not taken in cloud
+    try{
+      const avail=await checkUsernameAvailable(username.trim());
+      if(!avail)return setPwdErr('Username already taken — choose a different one.');
+    }catch{ /* offline — skip check, will fail on cloud save */ }
     setPwdErr(null);
     setFinishing(true);
     try{
@@ -69,11 +77,28 @@ export default function CreateWalletFlow({onWallet,onBack}){
         encryptedWallet:encrypted,
         createdAt:Date.now(),
       };
+      // Cloud backup — upload encrypted data to IPFS + register in Redis
+      setCloudStatus('saving');
+      try{
+        await saveCloudBackup(username.trim(), password, {
+          wallet: { address: wallet.address, privateKey: wallet.privateKey, username: username.trim() },
+          contacts: [],
+          messages: {},
+          profile: { name: username.trim() },
+        });
+        setCloudStatus('saved');
+      }catch(e){
+        console.warn('Cloud backup failed (offline?):', e);
+        setCloudStatus('error');
+      }
+
       // Store by username (lowercase) for login lookup
       const key='pmt_account_'+username.trim().toLowerCase();
       localStorage.setItem(key,JSON.stringify(account));
       // Also store current session (unencrypted for active session only)
       localStorage.setItem('pmt_session',JSON.stringify({username:username.trim(),address:wallet.address}));
+      // Small delay to show "saved" status before navigating
+      await new Promise(r=>setTimeout(r, cloudStatus==='saved'?800:0));
       onWallet({address:wallet.address,balance:'0.0000',network:'PMT Chain',chainId:'0x46c52',isCreated:true,username:username.trim()});
     }catch(e){
       setPwdErr('Failed to secure wallet: '+e.message);
