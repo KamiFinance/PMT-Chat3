@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getIpfsUrl } from '../../lib/pinata';
 import ProfilePic from '../ui/ProfilePic';
 
 import Avatar from '../ui/Avatar';
