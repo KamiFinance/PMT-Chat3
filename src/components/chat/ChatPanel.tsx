@@ -76,7 +76,7 @@ function EmojiPicker({onSelect,onClose}:{onSelect:(e:string)=>void,onClose:()=>v
   );
 }
 
-export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar,onBack}){
+export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar,onBack,onViewContact}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);
   const [showAttach,setShowAttach]=useState(false);
@@ -328,7 +328,9 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
           <div style={{padding:'12px 18px',display:'flex',alignItems:'center',gap:10}}>
             <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
               color={contact.isGroup?'var(--accent2)':contact.color}
-              bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
+              bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}
+              onClick={onViewContact ? ()=>onViewContact(contact) : undefined}
+              style={{cursor:onViewContact?'pointer':'default'}}/>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:600}}>{contact.name}</div>
               <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',opacity:.8,
