@@ -178,30 +178,38 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     setWcConnecting(true);
     setShowPicker(false);
     try{
+      // Always start fresh — reset any stale provider from previous attempts
+      resetWCProvider();
       const provider=await getWCProvider();
-      // If already connected, use existing session
-      if(provider.connected){
-        await connectWith(provider,'WalletConnect');
-        setWcConnecting(false);
-        return;
-      }
       // Listen for QR URI
       provider.once('display_uri',(uri)=>{
         setWcUri(uri);
         setWcConnecting(false);
       });
-      // Start connection
+      // Start connection — after connect() resolves, accounts are in provider.accounts
       provider.connect().then(async()=>{
         setWcUri(null);
-        await connectWith(provider,'WalletConnect');
+        const accounts = provider.accounts || [];
+        if (!accounts.length) { setErr('No accounts found in wallet.'); resetWCProvider(); return; }
+        const address = accounts[0];
+        const chainId = provider.chainId;
+        const netNames = {'0x1':'Ethereum','0x5':'Goerli','0xaa36a7':'Sepolia','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0x46c52':'PMT Chain'};
+        const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
+        const netName = netNames[chainHex] || ('Chain ' + chainId);
+        let balEth = '0.0000';
+        try {
+          const balHex = await provider.request({method:'eth_getBalance', params:[address,'latest']});
+          balEth = (parseInt(balHex,16)/1e18).toFixed(4);
+        } catch {}
+        onMetaMask({address, balance:balEth, network:netName, chainId:chainHex, isMetaMask:true, walletName:'WalletConnect'});
       }).catch((e)=>{
         setWcUri(null);
         setWcConnecting(false);
         resetWCProvider();
         const msg = e.message||String(e);
-        if(msg.includes('User rejected')||msg.includes('rejected')) setErr('Connection rejected.');
-        else if(msg.includes('reset')||msg.includes('closed')) { /* silently ignore */ }
-        else if(msg.includes('Project')||msg.includes('3000')) setErr('wc_no_project');
+        if(msg.includes('User rejected')||msg.includes('rejected')||msg.includes('declined')) setErr('Connection rejected.');
+        else if(msg.includes('reset')||msg.includes('closed')||msg.includes('disconnect')) { /* silently ignore */ }
+        else if(msg.includes('Project')||msg.includes('3000')||msg.includes('projectId')) setErr('wc_no_project');
         else setErr('WalletConnect: '+msg);
       });
     }catch(e){
