@@ -251,9 +251,9 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     if(mobile){
       // Already inside a wallet browser — connect directly
       if(window.ethereum){ connectWith(window.ethereum,walletBrowserName||'Wallet'); return; }
-      // Regular mobile browser — show deeplink picker: opens the dapp INSIDE the wallet browser
-      // (the wallet injects window.ethereum automatically once the dapp loads inside it)
+      // Start WC session in background, then show inline wallet tiles
       setShowMobilePicker(true);
+      handleWalletConnect(); // starts WC session; display_uri fires and sets wcUri
       return;
     }
     const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
@@ -327,29 +327,52 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           </div>
         ):null}
 
-        {/* Mobile deeplink wallet picker — opens dapp inside wallet browser */}
+        {/* Mobile inline wallet picker — WC-powered: tap wallet → approval screen → back to browser */}
         {showMobilePicker&&mobile&&(
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'14px'}}>
-            <div style={{fontSize:12,fontWeight:600,color:'var(--text)',marginBottom:4}}>Open in Wallet Browser</div>
+            <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:4}}>Choose your wallet</div>
             <p style={{fontSize:12,color:'var(--text2)',lineHeight:1.5,margin:'0 0 12px'}}>
-              Your wallet will open with PMT-Chat loaded inside it, then tap Connect.
+              Tap your wallet — it will show a connection confirmation. After approving, come back here.
             </p>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-              {MOBILE_WALLETS.map(w=>(
-                <a key={w.id} href={w.deeplink(pageUrl)} onClick={()=>setShowMobilePicker(false)}
-                  style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,
-                    padding:'12px 6px',background:'var(--surface2)',border:'1px solid var(--border)',
-                    borderRadius:12,textDecoration:'none',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
-                  onTouchStart={e=>e.currentTarget.style.borderColor='var(--accent)'}
-                  onTouchEnd={e=>e.currentTarget.style.borderColor='var(--border)'}>
-                  <div style={{width:40,height:40,borderRadius:10,overflow:'hidden'}}
-                    dangerouslySetInnerHTML={{__html:w.icon}}/>
-                  <span style={{fontSize:10,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
-                </a>
-              ))}
-            </div>
-            <button onClick={()=>setShowMobilePicker(false)}
-              style={{width:'100%',marginTop:10,padding:'9px',background:'transparent',
+            {/* Wallet tiles using native WC scheme — opens approval screen, NOT the website */}
+            {wcUri ? (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+                {[
+                  {id:'metamask',name:'MetaMask',scheme:(u)=>`metamask://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#F6851B"/><text y="28" x="20" text-anchor="middle" font-size="22">🦊</text></svg>'},
+                  {id:'trust',name:'Trust',scheme:(u)=>`trust://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#3375BB"/><text y="28" x="20" text-anchor="middle" font-size="22">🛡️</text></svg>'},
+                  {id:'coinbase',name:'Coinbase',scheme:(u)=>`cbwallet://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0052FF"/><text y="28" x="20" text-anchor="middle" font-size="20" fill="white" font-weight="bold">C</text></svg>'},
+                  {id:'rainbow',name:'Rainbow',scheme:(u)=>`rainbow://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><defs><linearGradient id="rb3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF6B6B"/><stop offset=".5" stop-color="#FFBA08"/><stop offset="1" stop-color="#118AB2"/></linearGradient></defs><rect width="40" height="40" rx="12" fill="url(#rb3)"/><text y="28" x="20" text-anchor="middle" font-size="22">🌈</text></svg>'},
+                  {id:'phantom',name:'Phantom',scheme:(u)=>`phantom://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#AB9FF2"/><text y="28" x="20" text-anchor="middle" font-size="22">👻</text></svg>'},
+                  {id:'imtoken',name:'imToken',scheme:(u)=>`imtokenv2://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#11C4D1"/><text y="26" x="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">iToken</text></svg>'},
+                  {id:'safepal',name:'SafePal',scheme:(u)=>`safepalwallet://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0F60FF"/><path d="M20 8 L30 13 L30 22 C30 27.5 25.5 32 20 33.5 C14.5 32 10 27.5 10 22 L10 13 Z" fill="none" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 20 L19 23 L24 17" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'},
+                  {id:'tangem',name:'Tangem',scheme:(u)=>`tangem://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#1C1C1E"/><rect x="9" y="13" width="22" height="14" rx="3" fill="none" stroke="white" stroke-width="2"/><rect x="12" y="16" width="7" height="4" rx="1" fill="white"/><circle cx="26" cy="21" r="2" fill="#00D4AA"/><circle cx="21" cy="21" r="2" fill="white" opacity="0.5"/></svg>'},
+                ].map(w=>(
+                  <a key={w.id} href={w.scheme(wcUri)}
+                    style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,
+                      padding:'12px 6px',background:'var(--surface2)',border:'1px solid var(--border)',
+                      borderRadius:12,textDecoration:'none',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
+                    onTouchStart={e=>e.currentTarget.style.borderColor='var(--accent)'}
+                    onTouchEnd={e=>e.currentTarget.style.borderColor='var(--border)'}>
+                    <div style={{width:40,height:40,borderRadius:10,overflow:'hidden'}}
+                      dangerouslySetInnerHTML={{__html:w.icon}}/>
+                    <span style={{fontSize:10,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              /* WC session still loading — show spinner */
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 0',
+                color:'var(--text2)',fontSize:13}}>
+                <span style={{width:16,height:16,border:'2px solid var(--border)',borderTopColor:'var(--accent)',
+                  borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>
+                Preparing connection...
+              </div>
+            )}
+            <p style={{fontSize:11,color:'var(--muted)',textAlign:'center',margin:'10px 0 4px',lineHeight:1.5}}>
+              After approving in your wallet, come back to this page.
+            </p>
+            <button onClick={()=>{setShowMobilePicker(false);resetWCProvider();setWcUri(null);}}
+              style={{width:'100%',padding:'9px',background:'transparent',
                 border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12}}>
               Cancel
             </button>
