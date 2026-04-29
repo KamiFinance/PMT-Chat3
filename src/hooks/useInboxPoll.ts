@@ -204,9 +204,37 @@ export function useInboxPoll({
     } catch { /* ignore poll errors */ }
   }, [wallet?.address, setMsgs, setContacts, pushNotif]);
 
+  // Also poll the cross-device API relay
+  const processApiInbox = useCallback(async () => {
+    if (!wallet?.address) return;
+    try {
+      const res = await fetch(`/api/inbox?address=${wallet.address.toLowerCase()}`);
+      if (!res.ok) return;
+      const msgs: InboxMessage[] = await res.json();
+      if (!msgs.length) return;
+      // Write to localStorage inbox so processInbox handles them
+      const inboxKey = `pmt_inbox_${wallet.address.toLowerCase()}`;
+      const existing = JSON.parse(localStorage.getItem(inboxKey) ?? '[]');
+      localStorage.setItem(inboxKey, JSON.stringify([...existing, ...msgs]));
+      processInbox();
+    } catch { /* offline or API not configured */ }
+  }, [wallet?.address, processInbox]);
+
   useEffect(() => {
     if (!wallet?.address || isDemo) return;
-    const interval = setInterval(processInbox, 2000);
-    return () => clearInterval(interval);
-  }, [wallet?.address, isDemo, processInbox]);
+    // Same-device: listen to storage events for instant delivery
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === `pmt_inbox_${wallet.address.toLowerCase()}`) processInbox();
+    };
+    window.addEventListener('storage', onStorage);
+    // Polling: local every 1s, cross-device API every 3s
+    const localInterval = setInterval(processInbox, 1000);
+    const apiInterval = setInterval(processApiInbox, 3000);
+    processApiInbox(); // immediate first check
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      clearInterval(localInterval);
+      clearInterval(apiInterval);
+    };
+  }, [wallet?.address, isDemo, processInbox, processApiInbox]);
 }
