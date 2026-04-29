@@ -273,7 +273,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
       {/* Single scroll container — header + messages + blockstrip + input all inside.
           Sticky header/input stay visible. Scroll events hit this div wherever the mouse is. */}
       <div ref={messagesRef} className="chat-messages"
-        style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',minHeight:0}}>
+        style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',minHeight:0,height:0}}>
 
         {/* ── Sticky header ── */}
         <div className="desktop-topbar"
