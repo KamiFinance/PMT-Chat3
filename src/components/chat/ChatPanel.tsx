@@ -10,10 +10,77 @@ import AttachMenu from './AttachMenu';
 import MobileTopbar from '../ui/MobileTopbar';
 import BlockStrip from '../ui/BlockStrip';
 import SendModal from '../modals/SendModal';
+
+// ── Emoji Picker ────────────────────────────────────────────────────────────
+const EMOJI_CATEGORIES = [
+  { label:'😀', name:'Smileys', emojis:['😀','😂','🤣','😅','😊','😇','🥰','😍','🤩','😘','😗','😙','😚','🙂','🤗','🤭','🤫','🤔','😐','😑','😶','🙄','😏','😒','😞','😔','😟','😕','🙃','🤑','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😓','😩','😫','🥱','😤','😡','🤬','😈','💀','💩','🤡','👻','👽','🤖','😺','😸','😹','😻','😼','😽'] },
+  { label:'👍', name:'Gestures', emojis:['👋','🤚','🖐','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🫀','🫁','🧠','🦷','🦴','👀','👁','👅','👄','🫦','💋','🩸'] },
+  { label:'❤️', name:'Hearts', emojis:['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','☸️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','🔱','⚜️','🔰','♻️','✅','🈴'] },
+  { label:'🎉', name:'Fun', emojis:['🎉','🎊','🎈','🎁','🎀','🎗','🎟','🎫','🎖','🏆','🥇','🥈','🥉','🏅','🎯','🎮','🕹','🎲','🎭','🎨','🖼','🎪','🎤','🎧','🎼','🎵','🎶','🎷','🎸','🎹','🎺','🎻','🥁','🎬','🎥','📽','🎞','📺','📷','📸','🔭','🔬','💡','🔦','🕯','🪔','🧯','💰','💴','💵','💶','💷','💸','💳','🪙'] },
+  { label:'🌍', name:'Nature', emojis:['🌍','🌎','🌏','🌐','🗺','🧭','🌋','🏔','⛰','🌁','🏕','🏖','🏜','🏝','🏞','🌅','🌄','🌠','🎇','🎆','🌇','🌆','🏙','🌃','🌌','🌉','🌁','⛺','🏗','🧱','🪨','🪵','🛖','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🗼','🗽','⛪','🕌','🛕','🕍','⛩','🕋','⛲','⛺'] },
+  { label:'🐶', name:'Animals', emojis:['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪲','🦟','🦗','🪳','🕷','🦂','🐢','🦖','🦕','🐍','🦎','🦴','🐡','🐠','🐟','🐬','🦭','🐳','🦈','🐙','🦑','🦐','🦞','🦀','🐡'] },
+  { label:'🍕', name:'Food', emojis:['🍕','🍔','🌮','🌯','🥪','🥙','🥗','🍜','🍝','🍛','🍣','🍱','🍤','🍙','🍚','🍘','🍥','🥮','🍢','🧆','🥚','🍳','🥘','🍲','🥣','🧇','🥞','🧈','🍞','🥐','🥖','🥨','🧀','🥓','🥩','🍗','🍖','🦴','🌭','🍟','🫕','🍦','🍧','🍨','🍩','🍪','🎂','🍰','🧁','🥧','🍫','🍬','🍭','🍮','🧃','🥤','🧋','☕','🍵','🧉','🍺','🍷'] },
+  { label:'✈️', name:'Travel', emojis:['✈️','🚀','🛸','🚁','🛩','🪂','⛵','🚢','🛳','⛴','🚤','🛥','🛻','🚗','🚕','🚙','🚌','🏎','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🏍','🛵','🚲','🛴','🛹','🛼','🚏','🛣','🛤','⛽','🚥','🚦','🚧','🛑','⚓','🪝','⛵','🚣','🛶','⛷','🏂','🪁','🏇','🧗','🚵','🚴'] },
+  { label:'💬', name:'Symbols', emojis:['💬','💭','🗯','💤','💢','💥','💦','💨','🕳','💝','💘','💖','💗','💓','💞','💕','💟','❣','❤','🔔','🔕','🎵','🎶','💲','💱','♻','🔰','✅','❌','❎','🚫','⛔','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔶','🔷','🔸','🔹','🔺','🔻','💠','🔘','🔲','🔳','⬜','⬛','◼','◻','◾','◽','▪','▫'] },
+];
+
+function EmojiPicker({onSelect,onClose}:{onSelect:(e:string)=>void,onClose:()=>void}){
+  const [cat,setCat]=React.useState(0);
+  const ref=React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(()=>{
+    const handler=(e:MouseEvent)=>{
+      if(ref.current&&!ref.current.contains(e.target as Node)) onClose();
+    };
+    setTimeout(()=>document.addEventListener('mousedown',handler),0);
+    return ()=>document.removeEventListener('mousedown',handler);
+  },[onClose]);
+
+  return(
+    <div ref={ref} style={{position:'absolute',bottom:'calc(100% + 8px)',left:0,
+      background:'var(--panel)',border:'1px solid var(--border)',borderRadius:14,
+      boxShadow:'0 8px 32px rgba(0,0,0,.5)',zIndex:200,width:320,overflow:'hidden',
+      display:'flex',flexDirection:'column'}}>
+      {/* Category tabs */}
+      <div style={{display:'flex',borderBottom:'1px solid var(--border)',padding:'4px 6px',gap:2,flexWrap:'wrap'}}>
+        {EMOJI_CATEGORIES.map((c,i)=>(
+          <button key={i} onClick={()=>setCat(i)} title={c.name}
+            style={{width:32,height:32,background:cat===i?'var(--surface2)':'transparent',
+              border:cat===i?'1px solid var(--border)':'1px solid transparent',
+              borderRadius:8,cursor:'pointer',fontSize:16,display:'flex',
+              alignItems:'center',justifyContent:'center',transition:'all .1s'}}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {/* Emoji grid */}
+      <div style={{padding:'8px 6px',display:'grid',gridTemplateColumns:'repeat(8,1fr)',
+        gap:2,maxHeight:220,overflowY:'auto'}}>
+        {EMOJI_CATEGORIES[cat].emojis.map((e,i)=>(
+          <button key={i} onClick={()=>{onSelect(e);}}
+            style={{width:34,height:34,background:'transparent',border:'none',
+              cursor:'pointer',fontSize:20,borderRadius:7,display:'flex',
+              alignItems:'center',justifyContent:'center',transition:'background .1s'}}
+            onMouseEnter={ev=>(ev.currentTarget.style.background='var(--surface2)')}
+            onMouseLeave={ev=>(ev.currentTarget.style.background='transparent')}>
+            {e}
+          </button>
+        ))}
+      </div>
+      {/* Category name */}
+      <div style={{padding:'4px 10px 6px',fontSize:10,color:'var(--muted)',
+        fontFamily:'var(--mono)',letterSpacing:'1px'}}>
+        {EMOJI_CATEGORIES[cat].name.toUpperCase()}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar,onBack}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);
   const [showAttach,setShowAttach]=useState(false);
+  const [showEmoji,setShowEmoji]=useState(false);
   const [recording,setRecording]=useState(false);
   const fileInputRef=useRef(null);
   const fileAcceptRef=useRef('*');
@@ -30,7 +97,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   useEffect(()=>{onSendRef.current=onSend;},[onSend]);
 
   useEffect(()=>bottomRef.current?.scrollIntoView({behavior:'smooth'}),[messages]);
-  useEffect(()=>{setText('');inputRef.current?.focus();setShowAttach(false);},[contact?.id]);
+  useEffect(()=>{setText('');inputRef.current?.focus();setShowAttach(false);setShowEmoji(false);},[contact?.id]);
   useEffect(()=>{
     if(!showAttach)return;
     const close=e=>{
@@ -41,6 +108,19 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   },[showAttach]);
 
   const send=()=>{const t=text.trim();if(!t)return;onSend(t);setText('');};
+  const insertEmoji=(emoji:string)=>{
+    const el=inputRef.current as any;
+    if(!el){setText(p=>p+emoji);return;}
+    const start=el.selectionStart??text.length;
+    const end=el.selectionEnd??text.length;
+    const newText=text.slice(0,start)+emoji+text.slice(end);
+    setText(newText);
+    // Restore cursor after emoji
+    requestAnimationFrame(()=>{
+      el.focus();
+      el.setSelectionRange(start+emoji.length,start+emoji.length);
+    });
+  };
 
   const formatSize=bytes=>{
     if(bytes<1024)return bytes+'B';
@@ -279,6 +359,16 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
                 onImage={accept=>openFilePicker(accept)}
                 onFile={accept=>openFilePicker(accept)}
                 onClose={()=>setShowAttach(false)}/>}
+            </div>
+            <div style={{position:'relative'}}>
+              <button onClick={()=>{setShowEmoji(v=>!v);setShowAttach(false);}}
+                style={{width:44,height:44,background:showEmoji?'var(--surface2)':'var(--surface)',
+                  border:`1px solid ${showEmoji?'var(--accent)':'var(--border)'}`,
+                  borderRadius:9,fontSize:20,display:'flex',alignItems:'center',
+                  justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}>
+                😊
+              </button>
+              {showEmoji&&<EmojiPicker onSelect={e=>{insertEmoji(e);}} onClose={()=>setShowEmoji(false)}/>}
             </div>
             <div style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
               display:'flex',alignItems:'flex-end',padding:'0 12px'}}>
