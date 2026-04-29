@@ -347,46 +347,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           </div>
         )}
 
-        {/* Mobile wallet grid */}
-        {showPicker&&mobile&&(
-          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'14px'}}>
-            <div style={{fontSize:12,color:'var(--muted)',fontFamily:'var(--mono)',letterSpacing:'1px',marginBottom:12}}>
-              SELECT YOUR WALLET
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-              {MOBILE_WALLETS.map(w=>(
-                <a key={w.id} href={w.deeplink(pageUrl)}
-                  style={{display:'flex',flexDirection:'column',alignItems:'center',gap:7,
-                    padding:'12px 8px',background:'var(--surface2)',border:'1px solid var(--border)',
-                    borderRadius:12,textDecoration:'none',cursor:'pointer'}}>
-                  <div style={{width:44,height:44,borderRadius:12,overflow:'hidden'}}
-                    dangerouslySetInnerHTML={{__html:w.icon}}/>
-                  <span style={{fontSize:11,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
-                </a>
-              ))}
-            </div>
-            <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
-              <button onClick={handleWalletConnect}
-                style={{width:'100%',padding:'11px',background:'rgba(59,153,252,.12)',
-                  border:'1px solid rgba(59,153,252,.35)',borderRadius:10,
-                  color:'#3B99FC',fontWeight:600,fontSize:13,cursor:'pointer',
-                  display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                {wcConnecting?<><span style={{width:13,height:13,border:'2px solid rgba(59,153,252,.3)',
-                  borderTopColor:'#3B99FC',borderRadius:'50%',display:'inline-block',
-                  animation:'spin .7s linear infinite'}}/>Connecting...</>
-                  :<>🔗 WalletConnect (QR Code)</>}
-              </button>
-            </div>
-            <p style={{fontSize:11,color:'var(--muted)',marginTop:10,lineHeight:1.5,textAlign:'center'}}>
-              Tap your wallet or scan QR with any wallet
-            </p>
-            <button onClick={()=>setShowPicker(false)}
-              style={{width:'100%',marginTop:4,padding:'9px',background:'transparent',
-                border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12}}>
-              Cancel
-            </button>
-          </div>
-        )}
+        {}
 
         {/* Main connect buttons */}
         {!showPicker&&(
@@ -403,7 +364,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
                     borderTopColor:'#000',borderRadius:'50%',display:'inline-block',
                     animation:'spin .7s linear infinite'}}/>Connecting...</>
                 :<><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 12h2a2 2 0 0 1 0 4h-2v-4z"/><path d="M2 10h20"/></svg>
-                {inWalletBrowser?`Connect ${walletBrowserName}`:mobile?'Connect Wallet':evmWallets.length>1?`Connect Wallet (${evmWallets.length} found)`:'Connect Wallet'}</>}
+                {inWalletBrowser?`Connect ${walletBrowserName}`:mobile?'Connect with Wallet':evmWallets.length>1?`Connect Wallet (${evmWallets.length} found)`:'Connect Wallet'}</>}
             </button>
 
             {/* WalletConnect button — shown on desktop only; mobile uses it via Connect Wallet */}
