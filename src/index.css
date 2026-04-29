@@ -104,10 +104,22 @@ input,textarea,select{font-size:16px!important}
 
   /* Full-height landing page on mobile */
   .landing-scroll{overflow-y:auto!important;-webkit-overflow-scrolling:touch}
+
+  /* Show/hide helpers */
+  .mobile-only-btn{display:block!important}
+  .desktop-only-btn{display:none!important}
+
+  /* Bigger tap targets on mobile */
+  .sidebar-footer button{min-height:48px!important;min-width:48px!important}
+
+  /* Sidebar always takes full 100% when open on mobile */
+  .sidebar-panel{width:88vw!important}
 }
 
 /* Desktop */
 @media(min-width:641px){
   .mobile-topbar{display:none!important}
   .sidebar-overlay{display:none!important}
+  .mobile-only-btn{display:none!important}
+  .desktop-only-btn{display:block!important}
 }

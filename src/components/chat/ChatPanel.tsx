@@ -10,7 +10,7 @@ import AttachMenu from './AttachMenu';
 import MobileTopbar from '../ui/MobileTopbar';
 import BlockStrip from '../ui/BlockStrip';
 import SendModal from '../modals/SendModal';
-export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar}){
+export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar,onBack}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);
   const [showAttach,setShowAttach]=useState(false);
@@ -187,7 +187,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   return(
     <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}>
       {/* Mobile topbar (shown only on mobile via CSS) */}
-      <MobileTopbar contact={contact} onBack={onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
+      <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
       {/* Header - hidden on mobile (MobileTopbar handles it) */}
       <div className="desktop-topbar" style={{padding:'12px 18px',borderBottom:'1px solid var(--border)',background:'var(--panel)',
         display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
