@@ -326,11 +326,12 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
           style={{position:'absolute',top:0,left:0,right:0,zIndex:10,
             borderBottom:'1px solid var(--border)',background:'var(--panel)'}}>
           <div style={{padding:'12px 18px',display:'flex',alignItems:'center',gap:10}}>
-            <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
-              color={contact.isGroup?'var(--accent2)':contact.color}
-              bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}
-              onClick={onViewContact ? ()=>onViewContact(contact) : undefined}
-              style={{cursor:onViewContact?'pointer':'default'}}/>
+            <span className="chat-clickable" onClick={onViewContact?(()=>onViewContact(contact)):undefined}
+              style={{cursor:onViewContact?'pointer':'default',flexShrink:0}}>
+              <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
+                color={contact.isGroup?'var(--accent2)':contact.color}
+                bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
+            </span>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:600}}>{contact.name}</div>
               <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',opacity:.8,
