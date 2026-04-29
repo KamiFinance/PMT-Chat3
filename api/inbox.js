@@ -1,15 +1,20 @@
-// Cross-device message relay
-// Uses Upstash Redis KV if configured, otherwise returns empty (same-device only)
+// Cross-device message relay using Upstash Redis (via KV_REDIS_URL)
+import Redis from 'ioredis';
 
-const KV_URL = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+let redis = null;
 
-async function kv(cmd, ...args) {
-  const res = await fetch(`${KV_URL}/${[cmd, ...args].join('/')}`, {
-    headers: { Authorization: `Bearer ${KV_TOKEN}` }
+function getRedis() {
+  if (redis) return redis;
+  const url = process.env.KV_REDIS_URL;
+  if (!url) return null;
+  redis = new Redis(url, {
+    maxRetriesPerRequest: 2,
+    connectTimeout: 5000,
+    lazyConnect: true,
+    tls: url.startsWith('rediss://') ? {} : undefined,
   });
-  const data = await res.json();
-  return data.result;
+  redis.on('error', () => {}); // silence errors
+  return redis;
 }
 
 export default async function handler(req, res) {
@@ -18,44 +23,50 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  // Graceful fallback when KV not configured
-  if (!KV_URL || !KV_TOKEN) {
+  const r = getRedis();
+  if (!r) {
+    // No Redis configured — graceful fallback (same-device only)
     if (req.method === 'GET') res.status(200).json([]);
     else res.status(200).json({ ok: true, relay: 'disabled' });
     return;
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const address = (url.searchParams.get('address') || '').toLowerCase().slice(0, 42);
+  const address = (url.searchParams.get('address') || '').toLowerCase().replace(/[^a-fx0-9]/g, '').slice(0, 42);
   if (!address) { res.status(400).json({ error: 'address required' }); return; }
 
-  const key = `pmt:${address}`;
+  const key = `pmt:inbox:${address}`;
 
-  if (req.method === 'GET') {
-    try {
-      const len = await kv('llen', key);
-      if (!len || len === 0) { res.status(200).json([]); return; }
-      const raw = await kv('lrange', key, '0', '-1');
-      // Delete after reading
-      await kv('del', key);
+  try {
+    await r.connect().catch(() => {}); // already connected is OK
+
+    if (req.method === 'GET') {
+      const len = await r.llen(key);
+      if (!len) { res.status(200).json([]); return; }
+      const pipeline = r.pipeline();
+      pipeline.lrange(key, 0, -1);
+      pipeline.del(key);
+      const results = await pipeline.exec();
+      const raw = results?.[0]?.[1] ?? [];
       const msgs = (Array.isArray(raw) ? raw : [])
         .map(m => { try { return JSON.parse(m); } catch { return null; } })
         .filter(Boolean);
       res.status(200).json(msgs);
-    } catch { res.status(200).json([]); }
-  } else if (req.method === 'POST') {
-    try {
+    } else if (req.method === 'POST') {
       let body = '';
-      await new Promise(resolve => {
-        req.on('data', chunk => body += chunk);
-        req.on('end', resolve);
-      });
+      await new Promise(resolve => { req.on('data', c => body += c); req.on('end', resolve); });
       const msg = JSON.parse(body);
-      await kv('rpush', key, JSON.stringify(msg));
-      await kv('expire', key, '604800'); // 7 days
+      const pipeline = r.pipeline();
+      pipeline.rpush(key, JSON.stringify(msg));
+      pipeline.expire(key, 604800); // 7 days
+      await pipeline.exec();
       res.status(200).json({ ok: true });
-    } catch (e) { res.status(500).json({ error: String(e) }); }
-  } else {
-    res.status(405).end();
+    } else {
+      res.status(405).end();
+    }
+  } catch (e) {
+    console.error('Redis error:', e.message);
+    if (req.method === 'GET') res.status(200).json([]);
+    else res.status(500).json({ error: 'relay unavailable' });
   }
 }
