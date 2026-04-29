@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ProfilePic from '../ui/ProfilePic';
 
 import Avatar from './Avatar';
-export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo,profile}){
+export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo,profile,onViewContact}){
   if(contact){
     return(
       <div className="mobile-topbar" style={{display:'none',alignItems:'center',gap:10,
@@ -16,7 +16,9 @@ export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo
         </button>
         <ProfilePic initials={contact.isGroup?'#':(contact.avatar||contact.name?.slice(0,2).toUpperCase()||'?')} avatarUrl={contact.avatarUrl||null}
           color={contact.isGroup?'var(--accent2)':(contact.color||'var(--accent2)')}
-          bg={contact.isGroup?'#1e1b30':(contact.bg||'#1e1b30')} online={contact.online||false} size={34} fs={12}/>
+          bg={contact.isGroup?'#1e1b30':(contact.bg||'#1e1b30')} online={contact.online||false} size={34} fs={12}
+          onClick={onViewContact&&!contact.isGroup?()=>onViewContact(contact):undefined}
+          style={{cursor:onViewContact&&!contact.isGroup?'pointer':'default'}}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:14,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{contact.name}</div>
           <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',opacity:.8}}>

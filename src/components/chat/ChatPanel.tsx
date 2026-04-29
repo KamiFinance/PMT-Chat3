@@ -286,7 +286,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   };
   return(
     <>
-      <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
+      <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar} onViewContact={onViewContact}/>
 
       {/* Outer wrapper — fills the chat-panel flex slot */}
       <div style={{flex:1,position:'relative',overflow:'hidden',minHeight:0}}>
