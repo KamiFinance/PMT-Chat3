@@ -14,15 +14,19 @@ export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo
             cursor:'pointer',padding:'2px 10px 2px 0',lineHeight:1,flexShrink:0,fontWeight:300}}>
           ‹
         </button>
-        <ProfilePic initials={contact.isGroup?'#':(contact.avatar||contact.name?.slice(0,2).toUpperCase()||'?')} avatarUrl={contact.avatarUrl||null}
-          color={contact.isGroup?'var(--accent2)':(contact.color||'var(--accent2)')}
-          bg={contact.isGroup?'#1e1b30':(contact.bg||'#1e1b30')} online={contact.online||false} size={34} fs={12}
-          onClick={onViewContact&&!contact.isGroup?()=>onViewContact(contact):undefined}
-          style={{cursor:onViewContact&&!contact.isGroup?'pointer':'default'}}/>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{contact.name}</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',opacity:.8}}>
-            {contact.isGroup?`${contact.members?.length||0} members`:contact.online?'● online':'PMT Chain'}
+        {/* Avatar + name: single tappable area to open profile */}
+        <div onClick={onViewContact&&!contact.isGroup?()=>onViewContact(contact):undefined}
+          style={{display:'flex',alignItems:'center',gap:10,flex:1,minWidth:0,
+            cursor:onViewContact&&!contact.isGroup?'pointer':'default',
+            WebkitTapHighlightColor:'transparent'}}>
+          <ProfilePic initials={contact.isGroup?'#':(contact.avatar||contact.name?.slice(0,2).toUpperCase()||'?')} avatarUrl={contact.avatarUrl||null}
+            color={contact.isGroup?'var(--accent2)':(contact.color||'var(--accent2)')}
+            bg={contact.isGroup?'#1e1b30':(contact.bg||'#1e1b30')} online={contact.online||false} size={34} fs={12}/>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{contact.name}</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',opacity:.8}}>
+              {contact.isGroup?`${contact.members?.length||0} members`:contact.online?'● online':'PMT Chain'}
+            </div>
           </div>
         </div>
       </div>

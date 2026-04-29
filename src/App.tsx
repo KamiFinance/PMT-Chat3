@@ -384,7 +384,19 @@ export default function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(inboxMsg),
-        }).catch(() => { /* offline or API not configured — localStorage delivery only */ });
+        }).then(r => {
+          if (!r.ok) console.warn('[PMT relay] POST failed:', r.status);
+        }).catch(e => {
+          console.warn('[PMT relay] POST error:', e?.message);
+          // Retry once after 2 seconds
+          setTimeout(() => {
+            fetch(`/api/inbox?address=${toAddr}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(inboxMsg),
+            }).catch(() => {});
+          }, 2000);
+        });
       } catch {}
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
