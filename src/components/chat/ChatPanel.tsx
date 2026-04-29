@@ -88,6 +88,20 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   const recordSecondsRef=useRef(0); // ref to avoid stale closure in onstop
   const [recorderError,setRecorderError]=useState(null);
   const bottomRef=useRef(null);
+  const messagesRef=useRef<HTMLDivElement>(null);
+
+  // Forward wheel events from anywhere in the chat panel to the messages scroller
+  const handlePanelWheel=useCallback((e:React.WheelEvent)=>{
+    const el=messagesRef.current;
+    if(!el) return;
+    // Only intercept if the event didn't originate from inside the messages div itself
+    if(el.contains(e.target as Node)) return;
+    // Don't interfere with inputs, textareas, or emoji/attach menus
+    const tag=(e.target as HTMLElement).tagName?.toLowerCase();
+    if(tag==='textarea'||tag==='input') return;
+    e.preventDefault();
+    el.scrollTop+=e.deltaY;
+  },[]);
   const inputRef=useRef(null);
   const mediaRecRef=useRef(null);
   const chunksRef=useRef([]);
@@ -265,7 +279,8 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
     recordSecondsRef.current=0;
   };
   return(
-    <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}>
+    <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}
+      onWheel={handlePanelWheel}>
       {/* Mobile topbar (shown only on mobile via CSS) */}
       <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
       {/* Header - hidden on mobile (MobileTopbar handles it) */}
@@ -295,7 +310,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
         )}
       </div>
       {/* Messages */}
-      <div style={{flex:1,overflowY:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:2}}>
+      <div ref={messagesRef} className="chat-messages" style={{flex:1,overflowY:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:2}}>
         {searchQuery&&(
           <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',
             margin:'4px 0 8px',background:'rgba(250,255,99,.08)',border:'1px solid rgba(250,255,99,.2)',
