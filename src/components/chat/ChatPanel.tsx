@@ -89,6 +89,25 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   const [recorderError,setRecorderError]=useState(null);
   const bottomRef=useRef(null);
   const messagesRef=useRef<HTMLDivElement>(null);
+
+  // Document-level wheel listener (capture phase) — works without any click,
+  // from the moment the mouse enters the chat area.
+  useEffect(()=>{
+    const handler=(e:WheelEvent)=>{
+      const msgs=messagesRef.current;
+      if(!msgs) return;
+      // Check mouse is inside the chat panel
+      const panel=msgs.closest('.chat-panel')||msgs.parentElement?.closest('.chat-panel');
+      if(!panel) return;
+      const r=panel.getBoundingClientRect();
+      if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) return;
+      // Redirect scroll to messages div
+      e.preventDefault();
+      msgs.scrollTop+=e.deltaY;
+    };
+    document.addEventListener('wheel',handler,{passive:false,capture:true});
+    return()=>document.removeEventListener('wheel',handler,{capture:true});
+  },[]);
   const inputRef=useRef(null);
   const mediaRecRef=useRef(null);
   const chunksRef=useRef([]);
