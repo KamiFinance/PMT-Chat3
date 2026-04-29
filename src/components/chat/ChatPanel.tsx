@@ -322,12 +322,12 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
         </div>
 
         {/* ── Header — .chat-passthrough makes all descendants pe:none, interactive elements pe:auto ── */}
-        <div className="desktop-topbar chat-passthrough"
+        <div className="desktop-topbar"
           style={{position:'absolute',top:0,left:0,right:0,zIndex:10,
             borderBottom:'1px solid var(--border)',background:'var(--panel)'}}>
           <div style={{padding:'12px 18px',display:'flex',alignItems:'center',gap:10}}>
-            <span className="chat-clickable" onClick={onViewContact?(()=>onViewContact(contact)):undefined}
-              style={{cursor:onViewContact?'pointer':'default',flexShrink:0}}>
+            <span onClick={onViewContact?(()=>onViewContact(contact)):undefined}
+              style={{cursor:onViewContact?'pointer':'default',flexShrink:0,pointerEvents:'auto'}}>
               <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
                 color={contact.isGroup?'var(--accent2)':contact.color}
                 bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
