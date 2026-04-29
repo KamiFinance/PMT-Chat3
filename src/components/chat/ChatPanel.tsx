@@ -267,154 +267,160 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   };
   return(
     <>
-      {/* Mobile topbar */}
       <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
 
-      {/* ONE scroll container = the entire chat area.
-          Header + input are sticky inside it → wheel anywhere in the chat scrolls messages. */}
-      <div ref={messagesRef}
-        style={{flex:1,overflowY:'auto',overflowX:'hidden',display:'flex',
-          flexDirection:'column',minHeight:0,background:'var(--bg)'}}>
+      {/* Outer wrapper — fills the chat-panel flex slot */}
+      <div style={{flex:1,position:'relative',overflow:'hidden',minHeight:0}}>
 
-        {/* ── Sticky header ─────────────────────────────────────────── */}
+        {/* ── Messages div covers the ENTIRE area — always under the cursor ── */}
+        <div ref={messagesRef}
+          style={{position:'absolute',inset:0,overflowY:'auto',
+            paddingTop:62,paddingBottom:95,
+            display:'flex',flexDirection:'column'}}>
+          <div style={{flex:1,padding:'0 20px 0',display:'flex',flexDirection:'column',gap:2}}>
+            {searchQuery&&(
+              <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',
+                margin:'4px 0 8px',background:'rgba(250,255,99,.08)',
+                border:'1px solid rgba(250,255,99,.2)',borderRadius:8,padding:'5px 12px'}}>
+                Showing results for "{searchQuery}"
+              </div>
+            )}
+            <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,
+              color:'var(--accent2)',margin:'6px 0',opacity:.7}}>
+              🔗 E2E encryption handshake verified · block #{currentBlock().toLocaleString()}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 8px',
+              fontFamily:'var(--mono)',fontSize:10,color:'var(--muted)',letterSpacing:'1px'}}>
+              <div style={{flex:1,height:1,background:'var(--border)'}}/>TODAY
+              <div style={{flex:1,height:1,background:'var(--border)'}}/>
+            </div>
+            {messages.map(m=>(
+              <Bubble key={m.id} msg={m} isOut={m.out} contact={contact}
+                onReact={onReact} searchQuery={searchQuery}/>
+            ))}
+            <div ref={bottomRef}/>
+          </div>
+        </div>
+
+        {/* ── Header — pointer-events:none so wheel events pass through to messages ── */}
         <div className="desktop-topbar"
-          style={{position:'sticky',top:0,zIndex:10,padding:'12px 18px',
-            borderBottom:'1px solid var(--border)',background:'var(--panel)',
-            display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-          <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
-            color={contact.isGroup?'var(--accent2)':contact.color}
-            bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
-          <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:600}}>{contact.name}</div>
-            <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',opacity:.8,
-              whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {contact.isGroup?`${contact.members?.length||0} members · PMT Chain`:contact.address}
+          style={{position:'absolute',top:0,left:0,right:0,zIndex:10,
+            pointerEvents:'none',
+            borderBottom:'1px solid var(--border)',background:'var(--panel)'}}>
+          {/* Inner row has pointer-events:auto for clicks */}
+          <div style={{pointerEvents:'auto',padding:'12px 18px',display:'flex',alignItems:'center',gap:10}}>
+            <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
+              color={contact.isGroup?'var(--accent2)':contact.color}
+              bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:600}}>{contact.name}</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',opacity:.8,
+                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {contact.isGroup?`${contact.members?.length||0} members · PMT Chain`:contact.address}
+              </div>
             </div>
+            <div className="chain-badge" style={{display:'flex',alignItems:'center',gap:5,
+              padding:'5px 10px',background:'rgba(99,210,255,.07)',
+              border:'1px solid rgba(99,210,255,.18)',borderRadius:20,
+              fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',flexShrink:0}}>
+              <div style={{width:6,height:6,borderRadius:'50%',background:'var(--accent3)',animation:'pulse 2s infinite'}}/>
+              PMT Chain
+            </div>
+            {!contact.isGroup&&(
+              <button className="qr-btn" onClick={()=>setShowSend(true)}
+                style={{padding:'5px 10px',background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:8,color:'var(--text2)',fontSize:12,cursor:'pointer',flexShrink:0}}>↑ PMT</button>
+            )}
           </div>
-          <div className="chain-badge" style={{display:'flex',alignItems:'center',gap:5,
-            padding:'5px 10px',background:'rgba(99,210,255,.07)',
-            border:'1px solid rgba(99,210,255,.18)',borderRadius:20,
-            fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',flexShrink:0}}>
-            <div style={{width:6,height:6,borderRadius:'50%',background:'var(--accent3)',animation:'pulse 2s infinite'}}/>
-            PMT Chain
-          </div>
-          {!contact.isGroup&&(
-            <button className="qr-btn" onClick={()=>setShowSend(true)}
-              style={{padding:'5px 10px',background:'var(--surface)',border:'1px solid var(--border)',
-                borderRadius:8,color:'var(--text2)',fontSize:12,cursor:'pointer',flexShrink:0}}>↑ PMT</button>
-          )}
         </div>
 
-        {/* ── Message list ─────────────────────────────────────────── */}
-        <div className="chat-messages" style={{flex:1,padding:'16px 20px',
-          display:'flex',flexDirection:'column',gap:2}}>
-          {searchQuery&&(
-            <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',
-              margin:'4px 0 8px',background:'rgba(250,255,99,.08)',
-              border:'1px solid rgba(250,255,99,.2)',borderRadius:8,padding:'5px 12px'}}>
-              Showing results for "{searchQuery}"
-            </div>
-          )}
-          <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,
-            color:'var(--accent2)',margin:'6px 0',opacity:.7}}>
-            🔗 E2E encryption handshake verified · block #{currentBlock().toLocaleString()}
+        {/* ── Block strip — pointer-events:none wrapper ── */}
+        <div style={{position:'absolute',bottom:70,left:0,right:0,zIndex:5,pointerEvents:'none'}}>
+          <div style={{pointerEvents:'auto'}}>
+            <BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 8px',
-            fontFamily:'var(--mono)',fontSize:10,color:'var(--muted)',letterSpacing:'1px'}}>
-            <div style={{flex:1,height:1,background:'var(--border)'}}/>TODAY
-            <div style={{flex:1,height:1,background:'var(--border)'}}/>
-          </div>
-          {messages.map(m=>(
-            <Bubble key={m.id} msg={m} isOut={m.out} contact={contact}
-              onReact={onReact} searchQuery={searchQuery}/>
-          ))}
-          <div ref={bottomRef}/>
         </div>
 
-        {/* ── Sticky block strip ────────────────────────────────────── */}
-        <div style={{position:'sticky',bottom:70,zIndex:5,flexShrink:0}}>
-          <BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
-        </div>
-
-        {/* ── Sticky input ─────────────────────────────────────────── */}
-        <div className="chat-input-row"
-          style={{position:'sticky',bottom:0,zIndex:10,padding:'12px 18px',
-            borderTop:'1px solid var(--border)',background:'var(--panel)',
-            display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
-          {recorderError&&(
-            <div style={{fontSize:11,color:'var(--danger)',fontFamily:'var(--mono)',
-              textAlign:'center'}}>{recorderError}</div>
-          )}
-          {recording?(
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <button onClick={cancelRecording}
-                style={{width:38,height:38,background:'var(--surface)',border:'1px solid var(--border)',
-                  borderRadius:9,color:'var(--danger)',fontSize:16,display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,cursor:'pointer'}}>✕</button>
-              <div style={{flex:1,background:'var(--surface)',border:'1px solid rgba(248,113,113,.4)',
-                borderRadius:12,display:'flex',alignItems:'center',padding:'0 14px',gap:10,height:42}}>
-                <div style={{width:8,height:8,borderRadius:'50%',background:'var(--danger)',
-                  animation:'pulse 1s infinite',flexShrink:0}}/>
-                <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--danger)'}}>
-                  {String(Math.floor(recordSeconds/60)).padStart(2,'0')}:{String(recordSeconds%60).padStart(2,'0')}
-                </span>
-                <span style={{fontSize:11,color:'var(--muted)',flex:1}}>Recording... tap stop to send</span>
+        {/* ── Input — pointer-events:none wrapper so wheel passes through ── */}
+        <div style={{position:'absolute',bottom:0,left:0,right:0,zIndex:10,pointerEvents:'none'}}>
+          <div className="chat-input-row"
+            style={{pointerEvents:'auto',padding:'12px 18px',
+              borderTop:'1px solid var(--border)',background:'var(--panel)',
+              display:'flex',flexDirection:'column',gap:6}}>
+            {recorderError&&(
+              <div style={{fontSize:11,color:'var(--danger)',fontFamily:'var(--mono)',textAlign:'center'}}>{recorderError}</div>
+            )}
+            {recording?(
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <button onClick={cancelRecording}
+                  style={{width:38,height:38,background:'var(--surface)',border:'1px solid var(--border)',
+                    borderRadius:9,color:'var(--danger)',fontSize:16,display:'flex',alignItems:'center',
+                    justifyContent:'center',flexShrink:0,cursor:'pointer'}}>✕</button>
+                <div style={{flex:1,background:'var(--surface)',border:'1px solid rgba(248,113,113,.4)',
+                  borderRadius:12,display:'flex',alignItems:'center',padding:'0 14px',gap:10,height:42}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:'var(--danger)',
+                    animation:'pulse 1s infinite',flexShrink:0}}/>
+                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--danger)'}}>
+                    {String(Math.floor(recordSeconds/60)).padStart(2,'0')}:{String(recordSeconds%60).padStart(2,'0')}
+                  </span>
+                  <span style={{fontSize:11,color:'var(--muted)',flex:1}}>Recording... tap stop to send</span>
+                </div>
+                <button onClick={stopRecording}
+                  style={{width:40,height:40,background:'var(--danger)',border:'none',
+                    borderRadius:10,color:'#fff',fontSize:16,display:'flex',alignItems:'center',
+                    justifyContent:'center',flexShrink:0,cursor:'pointer'}}>■</button>
               </div>
-              <button onClick={stopRecording}
-                style={{width:40,height:40,background:'var(--danger)',border:'none',
-                  borderRadius:10,color:'#fff',fontSize:16,display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,cursor:'pointer'}}>■</button>
-            </div>
-          ):(
-            <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
-              <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileChosen}/>
-              <div style={{position:'relative'}}>
-                <button onClick={()=>setShowAttach(v=>!v)}
-                  style={{width:44,height:44,background:showAttach?'var(--surface2)':'var(--surface)',
-                    border:`1px solid ${showAttach?'var(--accent)':'var(--border)'}`,
-                    borderRadius:9,color:showAttach?'var(--accent)':'var(--muted)',fontSize:18,
-                    display:'flex',alignItems:'center',justifyContent:'center',
-                    flexShrink:0,cursor:'pointer',transition:'all .15s'}}>📎</button>
-                {showAttach&&<AttachMenu
-                  onImage={accept=>openFilePicker(accept)}
-                  onFile={accept=>openFilePicker(accept)}
-                  onClose={()=>setShowAttach(false)}/>}
+            ):(
+              <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
+                <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileChosen}/>
+                <div style={{position:'relative'}}>
+                  <button onClick={()=>setShowAttach(v=>!v)}
+                    style={{width:44,height:44,background:showAttach?'var(--surface2)':'var(--surface)',
+                      border:`1px solid ${showAttach?'var(--accent)':'var(--border)'}`,
+                      borderRadius:9,color:showAttach?'var(--accent)':'var(--muted)',fontSize:18,
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      flexShrink:0,cursor:'pointer',transition:'all .15s'}}>📎</button>
+                  {showAttach&&<AttachMenu
+                    onImage={accept=>openFilePicker(accept)}
+                    onFile={accept=>openFilePicker(accept)}
+                    onClose={()=>setShowAttach(false)}/>}
+                </div>
+                <div style={{position:'relative'}}>
+                  <button onClick={()=>{setShowEmoji(v=>!v);setShowAttach(false);}}
+                    style={{width:44,height:44,background:showEmoji?'var(--surface2)':'var(--surface)',
+                      border:`1px solid ${showEmoji?'var(--accent)':'var(--border)'}`,
+                      borderRadius:9,fontSize:20,display:'flex',alignItems:'center',
+                      justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}>
+                    😊
+                  </button>
+                  {showEmoji&&<EmojiPicker onSelect={e=>{insertEmoji(e);}} onClose={()=>setShowEmoji(false)}/>}
+                </div>
+                <div style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:12,display:'flex',alignItems:'flex-end',padding:'0 12px'}}>
+                  <textarea ref={inputRef} rows={1} value={text}
+                    onChange={e=>setText(e.target.value)} onKeyDown={key}
+                    placeholder={`Message ${contact.name} (encrypted on-chain)...`}
+                    style={{flex:1,background:'transparent',border:'none',outline:'none',
+                      color:'var(--text)',fontFamily:'var(--sans)',fontSize:13.5,
+                      padding:'10px 0',resize:'none',lineHeight:1.5,maxHeight:120}}/>
+                  <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',
+                    opacity:.6,paddingBottom:11}}>🔒 E2E</span>
+                </div>
+                {text.trim()?(
+                  <button onClick={send}
+                    style={{width:44,height:44,background:'var(--accent)',border:'none',
+                      borderRadius:10,color:'#0a0c14',fontSize:18,display:'flex',alignItems:'center',
+                      justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}>➤</button>
+                ):(
+                  <button onClick={startRecording}
+                    style={{width:44,height:44,background:'var(--surface)',border:'1px solid var(--border)',
+                      borderRadius:10,color:'var(--accent2)',fontSize:20,display:'flex',alignItems:'center',
+                      justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}
+                    title="Hold to record voice message">🎙</button>
+                )}
               </div>
-              <div style={{position:'relative'}}>
-                <button onClick={()=>{setShowEmoji(v=>!v);setShowAttach(false);}}
-                  style={{width:44,height:44,background:showEmoji?'var(--surface2)':'var(--surface)',
-                    border:`1px solid ${showEmoji?'var(--accent)':'var(--border)'}`,
-                    borderRadius:9,fontSize:20,display:'flex',alignItems:'center',
-                    justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}>
-                  😊
-                </button>
-                {showEmoji&&<EmojiPicker onSelect={e=>{insertEmoji(e);}} onClose={()=>setShowEmoji(false)}/>}
-              </div>
-              <div style={{flex:1,background:'var(--surface)',border:'1px solid var(--border)',
-                borderRadius:12,display:'flex',alignItems:'flex-end',padding:'0 12px'}}>
-                <textarea ref={inputRef} rows={1} value={text}
-                  onChange={e=>setText(e.target.value)} onKeyDown={key}
-                  placeholder={`Message ${contact.name} (encrypted on-chain)...`}
-                  style={{flex:1,background:'transparent',border:'none',outline:'none',
-                    color:'var(--text)',fontFamily:'var(--sans)',fontSize:13.5,
-                    padding:'10px 0',resize:'none',lineHeight:1.5,maxHeight:120}}/>
-                <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',
-                  opacity:.6,paddingBottom:11}}>🔒 E2E</span>
-              </div>
-              {text.trim()?(
-                <button onClick={send}
-                  style={{width:44,height:44,background:'var(--accent)',border:'none',
-                    borderRadius:10,color:'#0a0c14',fontSize:18,display:'flex',alignItems:'center',
-                    justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}>➤</button>
-              ):(
-                <button onClick={startRecording}
-                  style={{width:44,height:44,background:'var(--surface)',border:'1px solid var(--border)',
-                    borderRadius:10,color:'var(--accent2)',fontSize:20,display:'flex',alignItems:'center',
-                    justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .15s'}}
-                  title="Hold to record voice message">🎙</button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
