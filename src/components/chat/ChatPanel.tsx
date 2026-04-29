@@ -89,27 +89,6 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   const [recorderError,setRecorderError]=useState(null);
   const bottomRef=useRef(null);
   const messagesRef=useRef<HTMLDivElement>(null);
-  const panelRef=useRef<HTMLDivElement>(null);
-
-  // Native wheel listener (passive:false) so we can scroll the messages div
-  // from anywhere in the chat panel — header, block strip, input bar, etc.
-  useEffect(()=>{
-    const panel=panelRef.current;
-    const msgs=messagesRef.current;
-    if(!panel||!msgs) return;
-    const onWheel=(e:WheelEvent)=>{
-      // Already inside the scrollable messages area — browser handles it natively
-      if(msgs.contains(e.target as Node)) return;
-      // Don't steal scroll from textarea (message input)
-      const tag=(e.target as HTMLElement).tagName?.toLowerCase();
-      if(tag==='textarea'||tag==='input') return;
-      // Forward to the messages scroller
-      e.preventDefault();
-      msgs.scrollTop+=e.deltaY;
-    };
-    panel.addEventListener('wheel',onWheel,{passive:false});
-    return ()=>panel.removeEventListener('wheel',onWheel);
-  },[]);
   const inputRef=useRef(null);
   const mediaRecRef=useRef(null);
   const chunksRef=useRef([]);
@@ -287,11 +266,11 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
     recordSecondsRef.current=0;
   };
   return(
-    <div ref={panelRef} style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}>
+    <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden',position:'relative'}}>
       {/* Mobile topbar (shown only on mobile via CSS) */}
       <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
       {/* Header - hidden on mobile (MobileTopbar handles it) */}
-      <div className="desktop-topbar" style={{padding:'12px 18px',borderBottom:'1px solid var(--border)',background:'var(--panel)',
+      <div className="desktop-topbar" style={{position:'relative',zIndex:10,padding:'12px 18px',borderBottom:'1px solid var(--border)',background:'var(--panel)',
         display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
         <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
           color={contact.isGroup?'var(--accent2)':contact.color} bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
@@ -317,7 +296,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
         )}
       </div>
       {/* Messages */}
-      <div ref={messagesRef} className="chat-messages" style={{flex:1,overflowY:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:2}}>
+      <div ref={messagesRef} className="chat-messages" style={{position:'absolute',inset:0,overflowY:'auto',padding:'16px 20px',paddingTop:'calc(62px + 16px)',paddingBottom:'calc(95px + 16px)',display:'flex',flexDirection:'column',gap:2}}>
         {searchQuery&&(
           <div style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',
             margin:'4px 0 8px',background:'rgba(250,255,99,.08)',border:'1px solid rgba(250,255,99,.2)',
@@ -338,9 +317,10 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
         ))}
         <div ref={bottomRef}/>
       </div>
-      <BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
+      <div style={{position:'absolute',bottom:70,left:0,right:0,zIndex:10}}><BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
       {/* Input */}
-      <div className="chat-input-row" style={{padding:'12px 18px',borderTop:'1px solid var(--border)',background:'var(--panel)',
+      </div>
+      <div className="chat-input-row" style={{position:'absolute',bottom:0,left:0,right:0,zIndex:10,padding:'12px 18px',borderTop:'1px solid var(--border)',background:'var(--panel)',
         display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
         {recorderError&&(
           <div style={{fontSize:11,color:'var(--danger)',fontFamily:'var(--mono)',textAlign:'center'}}>{recorderError}</div>
