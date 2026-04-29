@@ -5,39 +5,40 @@ import { getWCProvider, resetWCProvider } from '../../lib/walletconnect';
 
 const isMobile = () => /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
 
-// Popular mobile wallets with their deeplinks
+// Popular mobile wallets — deeplink opens the dapp in wallet browser,
+// wcRedirect opens WC approval screen then returns user to the site
 const MOBILE_WALLETS = [
   { id:'metamask', name:'MetaMask', color:'#F6851B',
     deeplink:(url)=>`https://metamask.app.link/dapp/${url}`,
-    wc:(uri)=>`https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#F6851B"/><text y="28" x="20" text-anchor="middle" font-size="22">🦊</text></svg>' },
   { id:'trust', name:'Trust', color:'#3375BB',
     deeplink:(url)=>`https://link.trustwallet.com/open_url?coin_id=60&url=https://${url}`,
-    wc:(uri)=>`https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}&returnUrl=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#3375BB"/><text y="28" x="20" text-anchor="middle" font-size="22">🛡️</text></svg>' },
   { id:'coinbase', name:'Coinbase', color:'#0052FF',
     deeplink:(url)=>`https://go.cb-wallet.com/wsegue?cb_url=https://${url}`,
-    wc:(uri)=>`https://go.cb-wallet.com/wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`https://go.cb-wallet.com/wc?uri=${encodeURIComponent(uri)}&return_url=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0052FF"/><text y="28" x="20" text-anchor="middle" font-size="20" fill="white" font-weight="bold">C</text></svg>' },
   { id:'rainbow', name:'Rainbow', color:'#175BFF',
     deeplink:(url)=>`https://rnbwapp.com/wc?uri=https://${url}`,
-    wc:(uri)=>`https://rnbwapp.com/wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`https://rnbwapp.com/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><defs><linearGradient id="rb" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF6B6B"/><stop offset=".5" stop-color="#FFBA08"/><stop offset="1" stop-color="#118AB2"/></linearGradient></defs><rect width="40" height="40" rx="12" fill="url(#rb)"/><text y="28" x="20" text-anchor="middle" font-size="22">🌈</text></svg>' },
   { id:'phantom', name:'Phantom', color:'#AB9FF2',
     deeplink:(url)=>`https://phantom.app/ul/browse/https://${url}?ref=https://${url}`,
-    wc:(uri)=>`https://phantom.app/ul/wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`https://phantom.app/ul/wc?uri=${encodeURIComponent(uri)}&redirectUrl=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#AB9FF2"/><text y="28" x="20" text-anchor="middle" font-size="22">👻</text></svg>' },
   { id:'imtoken', name:'imToken', color:'#11C4D1',
     deeplink:(url)=>`imtokenv2://navigate/DappBrowser?url=https://${url}`,
-    wc:(uri)=>`imtokenv2://wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`imtokenv2://wc?uri=${encodeURIComponent(uri)}&redirect=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#11C4D1"/><text y="26" x="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">iToken</text></svg>' },
   { id:'safepal', name:'SafePal', color:'#0F60FF',
     deeplink:(url)=>`https://link.safepal.io/dapp?url=https://${url}`,
-    wc:(uri)=>`safepalwallet://wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`safepalwallet://wc?uri=${encodeURIComponent(uri)}&return=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0F60FF"/><path d="M20 8 L30 13 L30 22 C30 27.5 25.5 32 20 33.5 C14.5 32 10 27.5 10 22 L10 13 Z" fill="none" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 20 L19 23 L24 17" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' },
   { id:'tangem', name:'Tangem', color:'#1C1C1E',
     deeplink:(url)=>`https://app.tangem.com/wc?uri=https://${url}`,
-    wc:(uri)=>`tangem://wc?uri=${encodeURIComponent(uri)}`,
+    wcRedirect:(uri,ret)=>`tangem://wc?uri=${encodeURIComponent(uri)}&returnUrl=${encodeURIComponent(ret)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#1C1C1E"/><rect x="9" y="13" width="22" height="14" rx="3" fill="none" stroke="white" stroke-width="2"/><rect x="12" y="16" width="7" height="4" rx="1" fill="white"/><circle cx="26" cy="21" r="2" fill="#00D4AA"/><circle cx="21" cy="21" r="2" fill="white" opacity="0.5"/></svg>' },
 ];
 
@@ -181,10 +182,23 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       // Always start fresh — reset any stale provider from previous attempts
       resetWCProvider();
       const provider=await getWCProvider();
-      // Listen for QR URI
+      // Listen for QR URI — fires when WC is ready
       provider.once('display_uri',(uri)=>{
         setWcUri(uri);
         setWcConnecting(false);
+        // On mobile: when user returns from wallet app, check if session connected
+        if(isMobile()){
+          const onVisible = () => {
+            if(document.visibilityState === 'visible'){
+              document.removeEventListener('visibilitychange', onVisible);
+              // Session might have resolved while app was in background
+              // The connect() promise handles this — just close the modal
+              // and let the .then() fire naturally
+              setWcUri(null);
+            }
+          };
+          document.addEventListener('visibilitychange', onVisible);
+        }
       });
       // Start connection — after connect() resolves, accounts are in provider.accounts
       provider.connect().then(async()=>{
@@ -451,8 +465,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
 
       {/* WalletConnect QR Modal */}
       {wcUri&&(
-        <WCModal uri={wcUri} onClose={()=>{setWcUri(null); resetWCProvider();}}
-          wcWallets={mobile?MOBILE_WALLETS:null}/>
+        <WCModal uri={wcUri} onClose={()=>{setWcUri(null); resetWCProvider();}} isMobileView={mobile}/>
       )}
     </div>
   );
