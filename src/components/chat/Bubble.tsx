@@ -195,8 +195,7 @@ export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
       onTouchStart={handleLongPress} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
       <div style={{display:'flex',alignItems:'flex-end',gap:8,marginBottom:3,flexDirection:isOut?'row-reverse':'row',animation:'fadeIn .2s ease'}}>
         {!isOut&&(
-          <div onClick={()=>setShowSenderProfile(true)} style={{cursor:'pointer',flexShrink:0}}
-            title={'View ' + (msg.senderName||contact?.name||'profile')}>
+          <div style={{flexShrink:0}}>
             <ProfilePic
               initials={msg.senderName?.slice(0,2).toUpperCase()||contact?.avatar}
               avatarUrl={msg.senderAvatarUrl!==undefined?msg.senderAvatarUrl:contact?.avatarUrl}
@@ -224,8 +223,7 @@ export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
       onTouchStart={handleLongPress} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
       <div style={{display:'flex',alignItems:'flex-end',gap:8,flexDirection:isOut?'row-reverse':'row',animation:'fadeIn .2s ease'}}>
         {!isOut&&(
-          <div onClick={()=>setShowSenderProfile(true)} style={{cursor:'pointer',flexShrink:0}}
-            title={'View ' + (msg.senderName||contact?.name||'profile')}>
+          <div style={{flexShrink:0}}>
             <ProfilePic
               initials={msg.senderName?.slice(0,2).toUpperCase()||contact?.avatar}
               avatarUrl={msg.senderAvatarUrl!==undefined?msg.senderAvatarUrl:contact?.avatarUrl}
