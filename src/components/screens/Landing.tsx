@@ -31,6 +31,14 @@ const MOBILE_WALLETS = [
     deeplink:(url)=>`imtokenv2://navigate/DappBrowser?url=https://${url}`,
     wc:(uri)=>`imtokenv2://wc?uri=${encodeURIComponent(uri)}`,
     icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#11C4D1"/><text y="26" x="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">iToken</text></svg>' },
+  { id:'safepal', name:'SafePal', color:'#0F60FF',
+    deeplink:(url)=>`https://link.safepal.io/dapp?url=https://${url}`,
+    wc:(uri)=>`safepalwallet://wc?uri=${encodeURIComponent(uri)}`,
+    icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0F60FF"/><path d="M20 8 L30 13 L30 22 C30 27.5 25.5 32 20 33.5 C14.5 32 10 27.5 10 22 L10 13 Z" fill="none" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 20 L19 23 L24 17" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' },
+  { id:'tangem', name:'Tangem', color:'#1C1C1E',
+    deeplink:(url)=>`https://app.tangem.com/wc?uri=https://${url}`,
+    wc:(uri)=>`tangem://wc?uri=${encodeURIComponent(uri)}`,
+    icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#1C1C1E"/><rect x="9" y="13" width="22" height="14" rx="3" fill="none" stroke="white" stroke-width="2"/><rect x="12" y="16" width="7" height="4" rx="1" fill="white"/><circle cx="26" cy="21" r="2" fill="#00D4AA"/><circle cx="21" cy="21" r="2" fill="white" opacity="0.5"/></svg>' },
 ];
 
 // WalletConnect QR Modal component
@@ -82,7 +90,7 @@ function WCModal({ uri, onClose, wcWallets }) {
             <div style={{fontSize:11,color:'var(--muted)',fontFamily:'var(--mono)',letterSpacing:'1px',marginBottom:8}}>
               OR OPEN IN YOUR WALLET APP
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
               {wcWallets.map(w=>(
                 <a key={w.id} href={w.wc(uri)}
                   style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,
@@ -313,7 +321,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
             <div style={{fontSize:12,color:'var(--muted)',fontFamily:'var(--mono)',letterSpacing:'1px',marginBottom:12}}>
               SELECT YOUR WALLET
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
               {MOBILE_WALLETS.map(w=>(
                 <a key={w.id} href={w.deeplink(pageUrl)}
                   style={{display:'flex',flexDirection:'column',alignItems:'center',gap:7,
