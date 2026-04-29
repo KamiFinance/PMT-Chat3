@@ -124,6 +124,8 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
   const [wallets,setWallets]=useState([]);
   const [showPicker,setShowPicker]=useState(false);
   const [showMobilePicker,setShowMobilePicker]=useState(false);
+  const [pendingWalletScheme,setPendingWalletScheme]=useState<string|null>(null);
+  const [waitingApproval,setWaitingApproval]=useState(false);
   const [mobile,setMobile]=useState(false);
   const [inWalletBrowser,setInWalletBrowser]=useState(false);
   const [walletBrowserName,setWalletBrowserName]=useState('');
@@ -251,12 +253,50 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     if(mobile){
       // Already inside a wallet browser — connect directly
       if(window.ethereum){ connectWith(window.ethereum,walletBrowserName||'Wallet'); return; }
-      // Start WC session in background, then show inline wallet tiles
+      // Show wallet tiles immediately — WC starts only when user taps a wallet
       setShowMobilePicker(true);
-      handleWalletConnect(); // starts WC session; display_uri fires and sets wcUri
       return;
     }
-    const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
+    // Called when user taps a wallet tile in the yellow button flow
+  // Starts WC session and immediately launches that wallet's native scheme
+  const connectViaWallet = async (schemeTemplate: (uri:string)=>string) => {
+    setShowMobilePicker(false);
+    setWaitingApproval(true);
+    setErr(null);
+    try {
+      resetWCProvider();
+      const provider = await getWCProvider();
+      // When WC URI is ready, open the wallet immediately
+      provider.once('display_uri', (uri: string) => {
+        window.location.href = schemeTemplate(uri);
+      });
+      provider.connect().then(async () => {
+        setWaitingApproval(false);
+        try { sessionStorage.removeItem('wc_pending'); } catch {}
+        const accounts = provider.accounts || [];
+        if (!accounts.length) { setErr('No accounts found.'); resetWCProvider(); return; }
+        const address = accounts[0];
+        const chainId = provider.chainId;
+        const netNames: any = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia'};
+        const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
+        const netName = netNames[chainHex] || ('Chain ' + chainId);
+        let balEth = '0.0000';
+        try { const h = await provider.request({method:'eth_getBalance',params:[address,'latest']}); balEth=(parseInt(h,16)/1e18).toFixed(4); } catch {}
+        onMetaMask({address,balance:balEth,network:netName,chainId:chainHex,isMetaMask:true,walletName:'WalletConnect'});
+      }).catch((e: any) => {
+        setWaitingApproval(false);
+        resetWCProvider();
+        const msg = e.message||String(e);
+        if(!msg.includes('reset')&&!msg.includes('closed')) setErr('Connection failed: '+msg);
+      });
+    } catch(e: any) {
+      setWaitingApproval(false);
+      resetWCProvider();
+      setErr('WalletConnect: '+(e.message||String(e)));
+    }
+  };
+
+  const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
     if(evmWallets.length===0){
       const p=window.ethereum?.isMetaMask?window.ethereum:null;
       if(p){connectWith(p,'MetaMask');return;}
@@ -265,6 +305,45 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     }
     if(evmWallets.length===1){ connectWith(evmWallets[0].provider,evmWallets[0].name); return; }
     setShowPicker(true);
+  };
+
+  // Called when user taps a wallet tile in the yellow button flow
+  // Starts WC session and immediately launches that wallet's native scheme
+  const connectViaWallet = async (schemeTemplate: (uri:string)=>string) => {
+    setShowMobilePicker(false);
+    setWaitingApproval(true);
+    setErr(null);
+    try {
+      resetWCProvider();
+      const provider = await getWCProvider();
+      // When WC URI is ready, open the wallet immediately
+      provider.once('display_uri', (uri: string) => {
+        window.location.href = schemeTemplate(uri);
+      });
+      provider.connect().then(async () => {
+        setWaitingApproval(false);
+        try { sessionStorage.removeItem('wc_pending'); } catch {}
+        const accounts = provider.accounts || [];
+        if (!accounts.length) { setErr('No accounts found.'); resetWCProvider(); return; }
+        const address = accounts[0];
+        const chainId = provider.chainId;
+        const netNames: any = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia'};
+        const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
+        const netName = netNames[chainHex] || ('Chain ' + chainId);
+        let balEth = '0.0000';
+        try { const h = await provider.request({method:'eth_getBalance',params:[address,'latest']}); balEth=(parseInt(h,16)/1e18).toFixed(4); } catch {}
+        onMetaMask({address,balance:balEth,network:netName,chainId:chainHex,isMetaMask:true,walletName:'WalletConnect'});
+      }).catch((e: any) => {
+        setWaitingApproval(false);
+        resetWCProvider();
+        const msg = e.message||String(e);
+        if(!msg.includes('reset')&&!msg.includes('closed')) setErr('Connection failed: '+msg);
+      });
+    } catch(e: any) {
+      setWaitingApproval(false);
+      resetWCProvider();
+      setErr('WalletConnect: '+(e.message||String(e)));
+    }
   };
 
   const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
@@ -327,54 +406,63 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           </div>
         ):null}
 
-        {/* Mobile inline wallet picker — WC-powered: tap wallet → approval screen → back to browser */}
+        {/* Mobile wallet picker — shown inline, tapping a wallet starts WC + opens that wallet's approval */}
         {showMobilePicker&&mobile&&(
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'14px'}}>
             <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:4}}>Choose your wallet</div>
             <p style={{fontSize:12,color:'var(--text2)',lineHeight:1.5,margin:'0 0 12px'}}>
-              Tap your wallet — it will show a connection confirmation. After approving, come back here.
+              Tap your wallet — it will show a connect confirmation. After approving, you'll be back here.
             </p>
-            {/* Wallet tiles using native WC scheme — opens approval screen, NOT the website */}
-            {wcUri ? (
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-                {[
-                  {id:'metamask',name:'MetaMask',scheme:(u)=>`metamask://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#F6851B"/><text y="28" x="20" text-anchor="middle" font-size="22">🦊</text></svg>'},
-                  {id:'trust',name:'Trust',scheme:(u)=>`trust://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#3375BB"/><text y="28" x="20" text-anchor="middle" font-size="22">🛡️</text></svg>'},
-                  {id:'coinbase',name:'Coinbase',scheme:(u)=>`cbwallet://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0052FF"/><text y="28" x="20" text-anchor="middle" font-size="20" fill="white" font-weight="bold">C</text></svg>'},
-                  {id:'rainbow',name:'Rainbow',scheme:(u)=>`rainbow://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><defs><linearGradient id="rb3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF6B6B"/><stop offset=".5" stop-color="#FFBA08"/><stop offset="1" stop-color="#118AB2"/></linearGradient></defs><rect width="40" height="40" rx="12" fill="url(#rb3)"/><text y="28" x="20" text-anchor="middle" font-size="22">🌈</text></svg>'},
-                  {id:'phantom',name:'Phantom',scheme:(u)=>`phantom://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#AB9FF2"/><text y="28" x="20" text-anchor="middle" font-size="22">👻</text></svg>'},
-                  {id:'imtoken',name:'imToken',scheme:(u)=>`imtokenv2://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#11C4D1"/><text y="26" x="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">iToken</text></svg>'},
-                  {id:'safepal',name:'SafePal',scheme:(u)=>`safepalwallet://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0F60FF"/><path d="M20 8 L30 13 L30 22 C30 27.5 25.5 32 20 33.5 C14.5 32 10 27.5 10 22 L10 13 Z" fill="none" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 20 L19 23 L24 17" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'},
-                  {id:'tangem',name:'Tangem',scheme:(u)=>`tangem://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#1C1C1E"/><rect x="9" y="13" width="22" height="14" rx="3" fill="none" stroke="white" stroke-width="2"/><rect x="12" y="16" width="7" height="4" rx="1" fill="white"/><circle cx="26" cy="21" r="2" fill="#00D4AA"/><circle cx="21" cy="21" r="2" fill="white" opacity="0.5"/></svg>'},
-                ].map(w=>(
-                  <a key={w.id} href={w.scheme(wcUri)}
-                    style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,
-                      padding:'12px 6px',background:'var(--surface2)',border:'1px solid var(--border)',
-                      borderRadius:12,textDecoration:'none',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
-                    onTouchStart={e=>e.currentTarget.style.borderColor='var(--accent)'}
-                    onTouchEnd={e=>e.currentTarget.style.borderColor='var(--border)'}>
-                    <div style={{width:40,height:40,borderRadius:10,overflow:'hidden'}}
-                      dangerouslySetInnerHTML={{__html:w.icon}}/>
-                    <span style={{fontSize:10,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              /* WC session still loading — show spinner */
-              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 0',
-                color:'var(--text2)',fontSize:13}}>
-                <span style={{width:16,height:16,border:'2px solid var(--border)',borderTopColor:'var(--accent)',
-                  borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>
-                Preparing connection...
-              </div>
-            )}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+              {[
+                {id:'metamask',name:'MetaMask',scheme:(u:string)=>`metamask://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#F6851B"/><text y="28" x="20" text-anchor="middle" font-size="22">🦊</text></svg>'},
+                {id:'trust',name:'Trust',scheme:(u:string)=>`trust://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#3375BB"/><text y="28" x="20" text-anchor="middle" font-size="22">🛡️</text></svg>'},
+                {id:'coinbase',name:'Coinbase',scheme:(u:string)=>`cbwallet://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0052FF"/><text y="28" x="20" text-anchor="middle" font-size="20" fill="white" font-weight="bold">C</text></svg>'},
+                {id:'rainbow',name:'Rainbow',scheme:(u:string)=>`rainbow://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><defs><linearGradient id="rb3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF6B6B"/><stop offset=".5" stop-color="#FFBA08"/><stop offset="1" stop-color="#118AB2"/></linearGradient></defs><rect width="40" height="40" rx="12" fill="url(#rb3)"/><text y="28" x="20" text-anchor="middle" font-size="22">🌈</text></svg>'},
+                {id:'phantom',name:'Phantom',scheme:(u:string)=>`phantom://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#AB9FF2"/><text y="28" x="20" text-anchor="middle" font-size="22">👻</text></svg>'},
+                {id:'imtoken',name:'imToken',scheme:(u:string)=>`imtokenv2://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#11C4D1"/><text y="26" x="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">iToken</text></svg>'},
+                {id:'safepal',name:'SafePal',scheme:(u:string)=>`safepalwallet://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0F60FF"/><path d="M20 8 L30 13 L30 22 C30 27.5 25.5 32 20 33.5 C14.5 32 10 27.5 10 22 L10 13 Z" fill="none" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 20 L19 23 L24 17" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'},
+                {id:'tangem',name:'Tangem',scheme:(u:string)=>`tangem://wc?uri=${encodeURIComponent(u)}`,icon:'<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#1C1C1E"/><rect x="9" y="13" width="22" height="14" rx="3" fill="none" stroke="white" stroke-width="2"/><rect x="12" y="16" width="7" height="4" rx="1" fill="white"/><circle cx="26" cy="21" r="2" fill="#00D4AA"/><circle cx="21" cy="21" r="2" fill="white" opacity="0.5"/></svg>'},
+              ].map((w:any)=>(
+                <button key={w.id}
+                  onClick={()=>connectViaWallet(w.scheme)}
+                  style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,
+                    padding:'12px 6px',background:'var(--surface2)',border:'1px solid var(--border)',
+                    borderRadius:12,cursor:'pointer',WebkitTapHighlightColor:'transparent',
+                    outline:'none',width:'100%'}}>
+                  <div style={{width:40,height:40,borderRadius:10,overflow:'hidden'}}
+                    dangerouslySetInnerHTML={{__html:w.icon}}/>
+                  <span style={{fontSize:10,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
+                </button>
+              ))}
+            </div>
             <p style={{fontSize:11,color:'var(--muted)',textAlign:'center',margin:'10px 0 4px',lineHeight:1.5}}>
-              After approving in your wallet, come back to this page.
+              After approving, come back to this page — you'll be connected.
             </p>
-            <button onClick={()=>{setShowMobilePicker(false);resetWCProvider();setWcUri(null);}}
+            <button onClick={()=>setShowMobilePicker(false)}
               style={{width:'100%',padding:'9px',background:'transparent',
                 border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12}}>
               Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Waiting for approval overlay — shown after user tapped a wallet tile */}
+        {waitingApproval&&(
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
+            padding:'20px 14px',display:'flex',flexDirection:'column',alignItems:'center',gap:14}}>
+            <div style={{width:44,height:44,borderRadius:'50%',border:'3px solid var(--accent)',
+              borderTopColor:'transparent',animation:'spin .8s linear infinite'}}/>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:14,fontWeight:600,margin:'0 0 6px',color:'var(--text)'}}>Waiting for approval...</p>
+              <p style={{fontSize:12,color:'var(--text2)',margin:0,lineHeight:1.5}}>
+                Approve the connection in your wallet, then come back to this page.
+              </p>
+            </div>
+            <button onClick={()=>{setWaitingApproval(false);resetWCProvider();}}
+              style={{padding:'8px 18px',background:'transparent',border:'1px solid var(--border)',
+                borderRadius:8,color:'var(--muted)',fontSize:12,cursor:'pointer'}}>
+              ← Cancel
             </button>
           </div>
         )}
@@ -403,7 +491,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         {}
 
         {/* Main connect buttons */}
-        {!showPicker&&!showMobilePicker&&(
+        {!showPicker&&!showMobilePicker&&!waitingApproval&&(
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {/* Primary: Connect Wallet (EIP-6963 / in-app browser) */}
             <button onClick={handleConnectWallet} disabled={connecting||wcConnecting}
