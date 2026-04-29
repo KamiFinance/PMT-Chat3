@@ -416,7 +416,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
                   borderRadius:12,display:'flex',alignItems:'flex-end',padding:'0 12px'}}>
                   <textarea ref={inputRef} rows={1} value={text}
                     onChange={e=>setText(e.target.value)} onKeyDown={key}
-                    placeholder="(encrypted on-chain)..."
+                    placeholder="(encrypted on-chain)"
                     style={{flex:1,background:'transparent',border:'none',outline:'none',
                       color:'var(--text)',fontFamily:'var(--sans)',fontSize:13.5,
                       padding:'10px 0',resize:'none',lineHeight:1.5,maxHeight:120}}/>
