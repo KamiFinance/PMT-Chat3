@@ -89,18 +89,26 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
   const [recorderError,setRecorderError]=useState(null);
   const bottomRef=useRef(null);
   const messagesRef=useRef<HTMLDivElement>(null);
+  const panelRef=useRef<HTMLDivElement>(null);
 
-  // Forward wheel events from anywhere in the chat panel to the messages scroller
-  const handlePanelWheel=useCallback((e:React.WheelEvent)=>{
-    const el=messagesRef.current;
-    if(!el) return;
-    // Only intercept if the event didn't originate from inside the messages div itself
-    if(el.contains(e.target as Node)) return;
-    // Don't interfere with inputs, textareas, or emoji/attach menus
-    const tag=(e.target as HTMLElement).tagName?.toLowerCase();
-    if(tag==='textarea'||tag==='input') return;
-    e.preventDefault();
-    el.scrollTop+=e.deltaY;
+  // Native wheel listener (passive:false) so we can scroll the messages div
+  // from anywhere in the chat panel — header, block strip, input bar, etc.
+  useEffect(()=>{
+    const panel=panelRef.current;
+    const msgs=messagesRef.current;
+    if(!panel||!msgs) return;
+    const onWheel=(e:WheelEvent)=>{
+      // Already inside the scrollable messages area — browser handles it natively
+      if(msgs.contains(e.target as Node)) return;
+      // Don't steal scroll from textarea (message input)
+      const tag=(e.target as HTMLElement).tagName?.toLowerCase();
+      if(tag==='textarea'||tag==='input') return;
+      // Forward to the messages scroller
+      e.preventDefault();
+      msgs.scrollTop+=e.deltaY;
+    };
+    panel.addEventListener('wheel',onWheel,{passive:false});
+    return ()=>panel.removeEventListener('wheel',onWheel);
   },[]);
   const inputRef=useRef(null);
   const mediaRecRef=useRef(null);
@@ -279,8 +287,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
     recordSecondsRef.current=0;
   };
   return(
-    <div style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}
-      onWheel={handlePanelWheel}>
+    <div ref={panelRef} style={{display:'flex',flexDirection:'column',background:'var(--bg)',height:'100%',overflow:'hidden'}}>
       {/* Mobile topbar (shown only on mobile via CSS) */}
       <MobileTopbar contact={contact} onBack={onBack||onOpenSidebar} onOpenSidebar={onOpenSidebar}/>
       {/* Header - hidden on mobile (MobileTopbar handles it) */}
