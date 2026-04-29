@@ -123,3 +123,14 @@ input,textarea,select{font-size:16px!important}
   .mobile-only-btn{display:none!important}
   .desktop-only-btn{display:block!important}
 }
+
+/* Chat: header + input wrappers pass wheel events through to messages div */
+.chat-passthrough { pointer-events: none !important; }
+.chat-passthrough button,
+.chat-passthrough a,
+.chat-passthrough input,
+.chat-passthrough textarea,
+.chat-passthrough select,
+.chat-passthrough [role="button"],
+.chat-passthrough .attach-menu,
+.chat-passthrough .emoji-picker { pointer-events: auto !important; }

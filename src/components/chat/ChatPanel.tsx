@@ -302,13 +302,11 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
           </div>
         </div>
 
-        {/* ── Header — pointer-events:none so wheel events pass through to messages ── */}
-        <div className="desktop-topbar"
+        {/* ── Header — .chat-passthrough makes all descendants pe:none, interactive elements pe:auto ── */}
+        <div className="desktop-topbar chat-passthrough"
           style={{position:'absolute',top:0,left:0,right:0,zIndex:10,
-            pointerEvents:'none',
             borderBottom:'1px solid var(--border)',background:'var(--panel)'}}>
-          {/* Inner row has pointer-events:auto for clicks */}
-          <div style={{pointerEvents:'auto',padding:'12px 18px',display:'flex',alignItems:'center',gap:10}}>
+          <div style={{padding:'12px 18px',display:'flex',alignItems:'center',gap:10}}>
             <ProfilePic initials={contact.isGroup?'#':contact.avatar} avatarUrl={contact.avatarUrl}
               color={contact.isGroup?'var(--accent2)':contact.color}
               bg={contact.isGroup?'#1e1b30':contact.bg} online={contact.online}/>
@@ -334,17 +332,17 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
           </div>
         </div>
 
-        {/* ── Block strip — pointer-events:none wrapper ── */}
-        <div style={{position:'absolute',bottom:70,left:0,right:0,zIndex:5,pointerEvents:'none'}}>
-          <div style={{pointerEvents:'auto'}}>
+        {/* ── Block strip ── */}
+        <div className="chat-passthrough" style={{position:'absolute',bottom:70,left:0,right:0,zIndex:5}}>
+          <div>
             <BlockStrip blockNum={currentBlock()} className="block-strip-bar"/>
           </div>
         </div>
 
-        {/* ── Input — pointer-events:none wrapper so wheel passes through ── */}
-        <div style={{position:'absolute',bottom:0,left:0,right:0,zIndex:10,pointerEvents:'none'}}>
+        {/* ── Input — .chat-passthrough makes background pass-through, buttons/textarea stay clickable ── */}
+        <div className="chat-passthrough" style={{position:'absolute',bottom:0,left:0,right:0,zIndex:10}}>
           <div className="chat-input-row"
-            style={{pointerEvents:'auto',padding:'12px 18px',
+            style={{padding:'12px 18px',
               borderTop:'1px solid var(--border)',background:'var(--panel)',
               display:'flex',flexDirection:'column',gap:6}}>
             {recorderError&&(
