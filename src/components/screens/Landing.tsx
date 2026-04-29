@@ -182,27 +182,21 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       // Always start fresh — reset any stale provider from previous attempts
       resetWCProvider();
       const provider=await getWCProvider();
-      // Listen for QR URI — fires when WC is ready
+      // Listen for QR URI — fires when WC is ready to connect
       provider.once('display_uri',(uri)=>{
         setWcUri(uri);
         setWcConnecting(false);
-        // On mobile: when user returns from wallet app, check if session connected
-        if(isMobile()){
-          const onVisible = () => {
-            if(document.visibilityState === 'visible'){
-              document.removeEventListener('visibilitychange', onVisible);
-              // Session might have resolved while app was in background
-              // The connect() promise handles this — just close the modal
-              // and let the .then() fire naturally
-              setWcUri(null);
-            }
-          };
-          document.addEventListener('visibilitychange', onVisible);
-        }
+        // Store pending WC session so we can resume if page reloads
+        try { sessionStorage.setItem('wc_pending', '1'); } catch {}
+        // On mobile: when user comes back from wallet app after approving,
+        // the connect() promise resolves automatically via WebSocket relay.
+        // We just need to keep the modal open while waiting — 
+        // the .then() handler below fires when the session is approved.
       });
       // Start connection — after connect() resolves, accounts are in provider.accounts
       provider.connect().then(async()=>{
         setWcUri(null);
+        try { sessionStorage.removeItem('wc_pending'); } catch {}
         const accounts = provider.accounts || [];
         if (!accounts.length) { setErr('No accounts found in wallet.'); resetWCProvider(); return; }
         const address = accounts[0];
@@ -219,6 +213,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       }).catch((e)=>{
         setWcUri(null);
         setWcConnecting(false);
+        try { sessionStorage.removeItem('wc_pending'); } catch {}
         resetWCProvider();
         const msg = e.message||String(e);
         if(msg.includes('User rejected')||msg.includes('rejected')||msg.includes('declined')) setErr('Connection rejected.');
