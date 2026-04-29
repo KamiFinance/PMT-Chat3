@@ -125,12 +125,13 @@ input,textarea,select{font-size:16px!important}
 }
 
 /* Chat: header + input wrappers pass wheel events through to messages div */
-.chat-passthrough { pointer-events: none !important; }
+/* ALL descendants pe:none so wheel falls through to messages div behind */
+.chat-passthrough,
+.chat-passthrough * { pointer-events: none !important; }
+/* Re-enable only actual interactive elements */
 .chat-passthrough button,
 .chat-passthrough a,
 .chat-passthrough input,
 .chat-passthrough textarea,
 .chat-passthrough select,
-.chat-passthrough [role="button"],
-.chat-passthrough .attach-menu,
-.chat-passthrough .emoji-picker { pointer-events: auto !important; }
+.chat-passthrough [role="button"] { pointer-events: auto !important; }
