@@ -1,61 +1,60 @@
-// Vercel serverless function — cross-device message relay
-// Uses Upstash Redis via KV environment variables
+// Cross-device message relay
+// Uses Upstash Redis KV if configured, otherwise returns empty (same-device only)
 
-const KV_REST_API_URL = process.env.KV_REST_API_URL;
-const KV_REST_API_TOKEN = process.env.KV_REST_API_TOKEN;
+const KV_URL = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
-async function kvFetch(path, method = 'GET', body = null) {
-  const res = await fetch(`${KV_REST_API_URL}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${KV_REST_API_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+async function kv(cmd, ...args) {
+  const res = await fetch(`${KV_URL}/${[cmd, ...args].join('/')}`, {
+    headers: { Authorization: `Bearer ${KV_TOKEN}` }
   });
-  return res.json();
+  const data = await res.json();
+  return data.result;
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-pmt-address');
-
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) {
-    // KV not configured — return empty (app falls back to localStorage)
-    if (req.method === 'GET') res.json([]);
-    else res.json({ ok: false, error: 'KV not configured' });
+  // Graceful fallback when KV not configured
+  if (!KV_URL || !KV_TOKEN) {
+    if (req.method === 'GET') res.status(200).json([]);
+    else res.status(200).json({ ok: true, relay: 'disabled' });
     return;
   }
 
-  const address = (req.query.address || '').toLowerCase().replace(/[^a-f0-9x.]/g, '');
-  if (!address) { res.status(400).json({ error: 'Missing address' }); return; }
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const address = (url.searchParams.get('address') || '').toLowerCase().slice(0, 42);
+  if (!address) { res.status(400).json({ error: 'address required' }); return; }
 
-  const key = `pmt:inbox:${address}`;
+  const key = `pmt:${address}`;
 
   if (req.method === 'GET') {
-    // Read all messages and clear the inbox atomically
     try {
-      const data = await kvFetch(`/lrange/${key}/0/-1`);
-      const messages = (data.result || []).map(m => { try { return JSON.parse(m); } catch { return null; } }).filter(Boolean);
-      if (messages.length > 0) await kvFetch(`/del/${key}`, 'GET');
-      res.json(messages);
-    } catch {
-      res.json([]);
-    }
+      const len = await kv('llen', key);
+      if (!len || len === 0) { res.status(200).json([]); return; }
+      const raw = await kv('lrange', key, '0', '-1');
+      // Delete after reading
+      await kv('del', key);
+      const msgs = (Array.isArray(raw) ? raw : [])
+        .map(m => { try { return JSON.parse(m); } catch { return null; } })
+        .filter(Boolean);
+      res.status(200).json(msgs);
+    } catch { res.status(200).json([]); }
   } else if (req.method === 'POST') {
-    // Add a message to the inbox
     try {
-      const msg = req.body;
-      await kvFetch(`/rpush/${key}`, 'POST', [JSON.stringify(msg)]);
-      // Expire inbox after 7 days
-      await kvFetch(`/expire/${key}/604800`, 'GET');
-      res.json({ ok: true });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    }
+      let body = '';
+      await new Promise(resolve => {
+        req.on('data', chunk => body += chunk);
+        req.on('end', resolve);
+      });
+      const msg = JSON.parse(body);
+      await kv('rpush', key, JSON.stringify(msg));
+      await kv('expire', key, '604800'); // 7 days
+      res.status(200).json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
   } else {
     res.status(405).end();
   }
