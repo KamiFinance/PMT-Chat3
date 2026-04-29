@@ -5,12 +5,15 @@ let wcProvider: any = null;
 
 export async function getWCProvider() {
   if (wcProvider) return wcProvider;
-  if (!WC_PROJECT_ID || WC_PROJECT_ID.length < 20) {
-    throw new Error('WalletConnect Project ID not configured. Get a free one at cloud.reown.com and add it as VITE_WC_PROJECT_ID in Vercel environment variables.');
+  // Allow runtime override (set by Landing.tsx when user pastes their project ID)
+  const runtimeId = (window as any).__WC_PROJECT_ID_OVERRIDE;
+  const effectiveId = runtimeId || WC_PROJECT_ID;
+  if (!effectiveId || effectiveId.length < 20 || effectiveId === '3fbb6bba6f1de962d911bb5b5c3dba68') {
+    throw new Error('WalletConnect Project ID not configured.');
   }
   const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
   wcProvider = await EthereumProvider.init({
-    projectId: WC_PROJECT_ID,
+    projectId: effectiveId,
     chains: [1],
     optionalChains: [137, 10, 42161, 56, 43114],
     showQrModal: false,   // we render our own QR

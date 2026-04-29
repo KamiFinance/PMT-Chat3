@@ -174,8 +174,20 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     }finally{setConnecting(false);}
   };
 
+  const [showWCSetup,setShowWCSetup]=useState(false);
+  const [wcInput,setWcInput]=useState('');
+
   const handleWalletConnect=async()=>{
     setErr(null);
+    // Check if project ID is valid — allow user-stored override
+    const storedId=localStorage.getItem('pmt_wc_project_id');
+    if(storedId) {
+      // User has saved their own ID — use it via env override
+      (window as any).__WC_PROJECT_ID_OVERRIDE=storedId;
+    }
+    const effId=storedId||(import.meta as any).env?.VITE_WC_PROJECT_ID;
+    const isPlaceholder=!effId||effId==='3fbb6bba6f1de962d911bb5b5c3dba68'||effId.length<20;
+    if(isPlaceholder){ setShowWCSetup(true); return; }
     setWcConnecting(true);
     setShowPicker(false);
     try{
@@ -461,6 +473,77 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       {/* WalletConnect QR Modal */}
       {wcUri&&(
         <WCModal uri={wcUri} onClose={()=>{setWcUri(null); resetWCProvider();}} isMobileView={mobile}/>
+      )}
+
+      {/* WalletConnect Setup — shown when no valid Project ID is configured */}
+      {showWCSetup&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.8)',display:'flex',alignItems:'center',
+          justifyContent:'center',zIndex:300,padding:16}} onClick={()=>setShowWCSetup(false)}>
+          <div style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:18,
+            padding:'24px 20px',width:'100%',maxWidth:380,display:'flex',flexDirection:'column',
+            gap:14,animation:'slideUp .25s ease'}} onClick={e=>e.stopPropagation()}>
+
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{width:10,height:10,borderRadius:'50%',background:'#3B99FC'}}/>
+                <span style={{fontSize:15,fontWeight:600}}>WalletConnect Setup</span>
+              </div>
+              <button onClick={()=>setShowWCSetup(false)}
+                style={{background:'none',border:'none',color:'var(--muted)',fontSize:22,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+
+            <p style={{fontSize:13,color:'var(--text2)',lineHeight:1.6,margin:0}}>
+              WalletConnect needs a free <strong style={{color:'var(--text)'}}>Project ID</strong> to work.
+              Get yours in 1 minute:
+            </p>
+
+            <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13,color:'var(--text2)'}}>
+              <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
+                <span style={{background:'#3B99FC',color:'#fff',borderRadius:'50%',width:20,height:20,
+                  display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:11,fontWeight:700}}>1</span>
+                <span>Open <a href="https://cloud.reown.com" target="_blank" rel="noreferrer"
+                  style={{color:'#3B99FC',fontWeight:500}}>cloud.reown.com</a> and sign up free</span>
+              </div>
+              <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
+                <span style={{background:'#3B99FC',color:'#fff',borderRadius:'50%',width:20,height:20,
+                  display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:11,fontWeight:700}}>2</span>
+                <span>Create a project → copy the <strong style={{color:'var(--text)'}}>Project ID</strong></span>
+              </div>
+              <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
+                <span style={{background:'#3B99FC',color:'#fff',borderRadius:'50%',width:20,height:20,
+                  display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:11,fontWeight:700}}>3</span>
+                <span>Paste it below — saved locally, works instantly</span>
+              </div>
+            </div>
+
+            <div style={{display:'flex',gap:8}}>
+              <input value={wcInput} onChange={e=>setWcInput(e.target.value.trim())}
+                placeholder="Paste Project ID here..."
+                style={{flex:1,padding:'10px 12px',background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:9,color:'var(--text)',fontFamily:'var(--mono)',fontSize:12,outline:'none'}}/>
+              <button
+                onClick={()=>{
+                  if(wcInput.length>=20){
+                    localStorage.setItem('pmt_wc_project_id',wcInput);
+                    (window as any).__WC_PROJECT_ID_OVERRIDE=wcInput;
+                    setShowWCSetup(false);
+                    setWcInput('');
+                    // Trigger WC connection now
+                    setTimeout(()=>handleWalletConnect(),100);
+                  }
+                }}
+                disabled={wcInput.length<20}
+                style={{padding:'10px 14px',background:wcInput.length>=20?'#3B99FC':'var(--surface)',
+                  border:'1px solid var(--border)',borderRadius:9,color:wcInput.length>=20?'#fff':'var(--muted)',
+                  fontWeight:600,fontSize:13,cursor:wcInput.length>=20?'pointer':'default',flexShrink:0}}>
+                Save
+              </button>
+            </div>
+            <p style={{fontSize:11,color:'var(--muted)',textAlign:'center',margin:0}}>
+              Project ID is saved locally in your browser only
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
