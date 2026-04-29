@@ -123,6 +123,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
   const [err,setErr]=useState(null);
   const [wallets,setWallets]=useState([]);
   const [showPicker,setShowPicker]=useState(false);
+  const [showMobilePicker,setShowMobilePicker]=useState(false);
   const [mobile,setMobile]=useState(false);
   const [inWalletBrowser,setInWalletBrowser]=useState(false);
   const [walletBrowserName,setWalletBrowserName]=useState('');
@@ -250,9 +251,9 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     if(mobile){
       // Already inside a wallet browser — connect directly
       if(window.ethereum){ connectWith(window.ethereum,walletBrowserName||'Wallet'); return; }
-      // Regular mobile browser — start WalletConnect session.
-      // This keeps user in their browser and asks wallet app for approval.
-      handleWalletConnect();
+      // Regular mobile browser — show deeplink picker: opens the dapp INSIDE the wallet browser
+      // (the wallet injects window.ethereum automatically once the dapp loads inside it)
+      setShowMobilePicker(true);
       return;
     }
     const evmWallets=wallets.filter(w=>!w.name?.toLowerCase().includes('tron'));
@@ -326,6 +327,35 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
           </div>
         ):null}
 
+        {/* Mobile deeplink wallet picker — opens dapp inside wallet browser */}
+        {showMobilePicker&&mobile&&(
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'14px'}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--text)',marginBottom:4}}>Open in Wallet Browser</div>
+            <p style={{fontSize:12,color:'var(--text2)',lineHeight:1.5,margin:'0 0 12px'}}>
+              Your wallet will open with PMT-Chat loaded inside it, then tap Connect.
+            </p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+              {MOBILE_WALLETS.map(w=>(
+                <a key={w.id} href={w.deeplink(pageUrl)} onClick={()=>setShowMobilePicker(false)}
+                  style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,
+                    padding:'12px 6px',background:'var(--surface2)',border:'1px solid var(--border)',
+                    borderRadius:12,textDecoration:'none',cursor:'pointer',WebkitTapHighlightColor:'transparent'}}
+                  onTouchStart={e=>e.currentTarget.style.borderColor='var(--accent)'}
+                  onTouchEnd={e=>e.currentTarget.style.borderColor='var(--border)'}>
+                  <div style={{width:40,height:40,borderRadius:10,overflow:'hidden'}}
+                    dangerouslySetInnerHTML={{__html:w.icon}}/>
+                  <span style={{fontSize:10,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
+                </a>
+              ))}
+            </div>
+            <button onClick={()=>setShowMobilePicker(false)}
+              style={{width:'100%',marginTop:10,padding:'9px',background:'transparent',
+                border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12}}>
+              Cancel
+            </button>
+          </div>
+        )}
+
         {/* Desktop EIP-6963 wallet picker */}
         {showPicker&&!mobile&&(
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
@@ -350,7 +380,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         {}
 
         {/* Main connect buttons */}
-        {!showPicker&&(
+        {!showPicker&&!showMobilePicker&&(
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {/* Primary: Connect Wallet (EIP-6963 / in-app browser) */}
             <button onClick={handleConnectWallet} disabled={connecting||wcConnecting}
