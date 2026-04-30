@@ -1,70 +1,76 @@
-// Cross-device message relay using ioredis + KV_REDIS_URL
-import Redis from 'ioredis';
-
-function makeRedis() {
-  const url = process.env.KV_REDIS_URL;
-  if (!url) return null;
-  const r = new Redis(url, {
-    maxRetriesPerRequest: 1,
-    connectTimeout: 4000,
-    commandTimeout: 4000,
-    enableOfflineQueue: false,
-    lazyConnect: false,
-    tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-  });
-  r.on('error', () => {}); // suppress unhandled error events
-  return r;
-}
+// Cross-device message relay — pure fetch REST, no TCP connections
+// Works reliably in Vercel serverless (no ioredis, no persistent connections)
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Cache-Control', 'no-store, no-cache');
+}
+
+// Execute a Redis command via REST API (works with both Upstash and Redis Cloud REST)
+async function redis(cmd, ...args) {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  // If REST URL available, use it
+  if (url && token) {
+    const res = await fetch(`${url}/${[cmd, ...args].map(encodeURIComponent).join('/')}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    return data.result;
+  }
+
+  // Fallback: derive Upstash REST from KV_REDIS_URL redis://default:TOKEN@HOST
+  const redisUrl = process.env.KV_REDIS_URL;
+  if (redisUrl) {
+    try {
+      const u = new URL(redisUrl);
+      const restUrl = `https://${u.hostname}`;
+      const restToken = u.password;
+      const res = await fetch(`${restUrl}/${[cmd, ...args].map(encodeURIComponent).join('/')}`, {
+        headers: { Authorization: `Bearer ${restToken}` }
+      });
+      const data = await res.json();
+      return data.result;
+    } catch {}
+  }
+
+  throw new Error('No Redis REST credentials configured');
 }
 
 export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const address = (url.searchParams.get('address') || '').toLowerCase().slice(0, 66);
+  const urlObj = new URL(req.url, `http://${req.headers.host}`);
+  const address = (urlObj.searchParams.get('address') || '').toLowerCase().trim();
   if (!address) { res.status(400).json({ error: 'address required' }); return; }
-
-  // Create a fresh Redis connection per request (serverless-safe)
-  const r = makeRedis();
-  if (!r) {
-    if (req.method === 'GET') res.status(200).json([]);
-    else res.status(200).json({ ok: true, relay: 'disabled' });
-    return;
-  }
 
   const key = `pmt:${address}`;
 
   try {
     if (req.method === 'GET') {
-      const msgs = await r.lrange(key, 0, -1);
-      if (msgs.length > 0) await r.del(key);
-      const parsed = msgs.map(m => { try { return JSON.parse(m); } catch { return null; } }).filter(Boolean);
-      res.status(200).json(parsed);
+      const msgs = await redis('LRANGE', key, '0', '-1');
+      if (msgs && msgs.length > 0) await redis('DEL', key);
+      const parsed = (msgs || []).map(m => { try { return JSON.parse(m); } catch { return null; } }).filter(Boolean);
+      return res.status(200).json(parsed);
 
     } else if (req.method === 'POST') {
       let body = '';
       await new Promise(resolve => { req.on('data', c => body += c); req.on('end', resolve); });
       const msg = JSON.parse(body);
-      await r.rpush(key, JSON.stringify(msg));
-      await r.expire(key, 604800); // 7 days
-      res.status(200).json({ ok: true });
+      await redis('RPUSH', key, JSON.stringify(msg));
+      await redis('EXPIRE', key, '604800');
+      return res.status(200).json({ ok: true });
 
     } else {
       res.status(405).end();
     }
   } catch (e) {
-    console.error('[inbox] Redis error:', e.message);
-    if (req.method === 'GET') res.status(200).json([]);
-    else res.status(500).json({ error: String(e.message) });
-  } finally {
-    r.disconnect();
+    console.error('[inbox]', e.message);
+    if (req.method === 'GET') return res.status(200).json([]);
+    return res.status(500).json({ error: e.message });
   }
 }
