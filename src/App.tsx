@@ -20,7 +20,6 @@ function playNotifSound() {
   } catch { /* ignore */ }
 }
 import { uploadToPinata, getIpfsUrl } from './lib/pinata';
-import { saveCloudBackup } from './lib/cloudBackup';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
 import { AI_AGENT_ADDRESS, AI_AGENT_CONTACT } from './constants/ai';
@@ -208,24 +207,6 @@ export default function App() {
     storage.setMsgs(accountKey, msgs);
   }, [msgs, accountKey]);
 
-  // Auto cloud backup every 5 minutes for username/password accounts
-  useEffect(() => {
-    if (!wallet?.address || isDemo) return;
-    const doBackup = async () => {
-      try {
-        const accountKey2 = `pmt_account_${wallet.address.toLowerCase()}`;
-        const stored = localStorage.getItem(accountKey2);
-        if (!stored) return;
-        const account = JSON.parse(stored);
-        if (!account.username || !account.encryptedWallet) return;
-        // We can't re-derive the password from stored data (by design)
-        // Auto-backup only happens at login/creation — this is intentional
-        // Users can manually trigger backup from profile settings
-      } catch { /* ignore */ }
-    };
-    doBackup();
-  }, [wallet?.address, isDemo]);
-
   const pushNotif = useCallback((contact: Contact, text: string) => {
     const id = uid();
     const n: Notif = { id, contact, text, ts: Date.now() };
@@ -375,26 +356,16 @@ export default function App() {
       const toAddr = normalizeAddress(activeRef.current.address);
       const msgContent = isVoice ? '🎙 Voice message' : isImage ? '🖼 Image' : isFile ? `📄 ${(input as Message).fileName ?? 'File'}` : input as string;
       const msgType = isVoice ? 'voice' : isImage ? 'image' : isFile ? 'file' : 'text';
-      // Build relay payload safely — separate from localStorage write
-      const inboxMsg: Record<string,unknown> = {
-        id: msg.id, type: msgType, text: msgContent,
-        from: w.address,
-        fromName: profileRef.current?.name || w.username || w.address.slice(0, 8),
-        fromAvatarUrl: profileRef.current?.avatarUrl ?? null,
-        fromBio: profileRef.current?.bio ?? '',
-        time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now(),
-      };
-      if (isVoice) { inboxMsg.duration = (input as Message).duration; inboxMsg.waveform = (input as Message).waveform; inboxMsg.audioMsgId = (input as Message).audioMsgId; inboxMsg.ipfsCid = (input as Message).ipfsCid; inboxMsg.ipfsUrl = (input as Message).ipfsUrl; }
-      if (isImage || isFile) { inboxMsg.mediaMsgId = (input as Message).mediaMsgId; inboxMsg.fileName = (input as Message).fileName; inboxMsg.fileSize = (input as Message).fileSize; inboxMsg.mimeType = (input as Message).mimeType; inboxMsg.ipfsCid = (input as Message).ipfsCid ?? null; }
-      // Same-device delivery
-      try { const ex: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]'); localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...ex, inboxMsg])); } catch {}
-      // Cross-device relay
       try {
+        const inboxMsg = { id: msg.id, type: msg.type, text: msgContent, ...(isVoice && { duration: (input as Message).duration, waveform: (input as Message).waveform, audioMsgId: (input as Message).audioMsgId, ipfsCid: (input as Message).ipfsCid, ipfsUrl: (input as Message).ipfsUrl }), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
+        const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
+        localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
+        // Also deliver via cross-device API relay (fire-and-forget)
         fetch(`/api/inbox?address=${toAddr}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(inboxMsg),
-        }).catch(() => {});
+        }).catch(() => { /* offline or API not configured — localStorage delivery only */ });
       } catch {}
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
@@ -418,21 +389,7 @@ export default function App() {
     if (accountKey) storage.setProfile(accountKey, np);
   }, [accountKey]);
 
-  const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
-    setWallet(w);
-    walletRef.current = w;
-    // If cloud restore: seed contacts and messages
-    if (w.restoredContacts?.length) {
-      setContacts(w.restoredContacts);
-    }
-    if (w.restoredMessages && Object.keys(w.restoredMessages).length) {
-      setMsgs(w.restoredMessages);
-    }
-    if (w.restoredProfile) {
-      setProfile(w.restoredProfile);
-    }
-    setScreen('chat');
-  }, [setContacts, setMsgs]);
+  const handleWallet = useCallback((w: Wallet) => { setWallet(w); walletRef.current = w; setScreen('chat'); }, []);
   const handleDemo = useCallback(() => { setIsDemo(true); const w = { address: 'demo', balance: '2.847', network: 'PMT Chain', username: 'Demo' }; setWallet(w); walletRef.current = w; setScreen('chat'); }, []);
   const handleLogout = useCallback(() => { storage.clearSession(); setWallet(null); walletRef.current = null; setIsDemo(false); setContacts([]); setMsgs({}); setActiveAndRef(null); setScreen('landing'); }, [setActiveAndRef]);
 
@@ -490,7 +447,7 @@ export default function App() {
         <div className={`sidebar-overlay${mobileSidebarOpen ? ' visible' : ''}`} onClick={() => setMobileSidebarOpen(false)} />
         <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
         <main className="chat-panel">
-          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} onViewContact={(c) => setEditContact(c)} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
+          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
         </main>
       </div>
       {showProfile && <ProfileModal profile={{ ...profile, address: wallet?.address ?? null }} onClose={() => setShowProfile(false)} onSave={saveProfile} />}

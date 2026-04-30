@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 
-export default function ProfilePic({avatarUrl,initials,color,bg,size=38,fs=13,online=false,onClick=undefined,style={}}){
+export default function ProfilePic({avatarUrl,initials,color,bg,size=38,fs=13,online=false}){
   return(
-    <div onClick={onClick} style={{width:size,height:size,borderRadius:'50%',background:bg||'#1e2438',...(style||{}),
+    <div style={{width:size,height:size,borderRadius:'50%',background:bg||'#1e2438',
       display:'flex',alignItems:'center',justifyContent:'center',
       fontWeight:600,fontSize:fs,flexShrink:0,position:'relative',overflow:'hidden'}}>
       {avatarUrl
