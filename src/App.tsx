@@ -230,9 +230,9 @@ export default function App() {
         // Strip binary blobs from messages before backup (keep metadata + IPFS CIDs)
         const cleanMsgs: Record<string, object[]> = {};
         Object.entries(msgs).forEach(([addr, arr]) => {
-          cleanMsgs[addr] = (arr as any[]).map(m => {
-            const { b64Data, audioUrl, fileUrl, imgData, fileData, uploading, _toAddr, ...keep } = m;
-            // Keep IPFS references so media can be re-fetched on restore
+          cleanMsgs[addr] = (arr as any[]).slice(-50).map(m => {
+            const { b64Data, audioUrl, fileUrl, imgData, fileData,
+                    uploading, _toAddr, waveform, audioB64, ...keep } = m;
             return keep;
           });
         });
@@ -511,8 +511,9 @@ export default function App() {
         if (!password) return;
         const cleanMsgs: Record<string, object[]> = {};
         Object.entries(msgs).forEach(([addr, arr]) => {
-          cleanMsgs[addr] = (arr as any[]).map(m => {
-            const { b64Data, audioUrl, fileUrl, imgData, fileData, uploading, _toAddr, ...keep } = m;
+          cleanMsgs[addr] = (arr as any[]).slice(-50).map(m => {
+            const { b64Data, audioUrl, fileUrl, imgData, fileData,
+                    uploading, _toAddr, waveform, audioB64, ...keep } = m;
             return keep;
           });
         });
@@ -607,7 +608,7 @@ export default function App() {
                     sessionPasswordRef.current=backupPromptPassword;
                     const cleanMsgs:Record<string,object[]>={};
                     Object.entries(msgs).forEach(([addr,arr])=>{
-                      cleanMsgs[addr]=(arr as any[]).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,...keep}=m;return keep;});
+                      cleanMsgs[addr]=(arr as any[]).slice(-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
                     });
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
@@ -635,7 +636,7 @@ export default function App() {
                     sessionPasswordRef.current=backupPromptPassword;
                     const cleanMsgs:Record<string,object[]>={};
                     Object.entries(msgs).forEach(([addr,arr])=>{
-                      cleanMsgs[addr]=(arr as any[]).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,...keep}=m;return keep;});
+                      cleanMsgs[addr]=(arr as any[]).slice(-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
                     });
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
