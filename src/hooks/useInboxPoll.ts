@@ -131,10 +131,19 @@ export function useInboxPoll({
         try {
           const profileKey = `pmt_profile_${senderAddr}`;
           const savedProfile = localStorage.getItem(profileKey);
-          if (savedProfile) {
-            const p = JSON.parse(savedProfile);
-            if (p.avatarUrl) senderAvatarUrl = p.avatarUrl;
-            if (p.bio) senderBio = p.bio;
+          const existing = savedProfile ? JSON.parse(savedProfile) : {};
+          // Prefer incoming data (fresher) over cached data
+          if (!inboxMsg.fromAvatarUrl && existing.avatarUrl) senderAvatarUrl = existing.avatarUrl;
+          if (!inboxMsg.fromBio && existing.bio) senderBio = existing.bio;
+          // Always update cache with latest incoming data
+          if (inboxMsg.fromAvatarUrl || inboxMsg.fromBio || inboxMsg.fromName) {
+            localStorage.setItem(profileKey, JSON.stringify({
+              ...existing,
+              ...(inboxMsg.fromAvatarUrl ? { avatarUrl: inboxMsg.fromAvatarUrl } : {}),
+              ...(inboxMsg.fromBio ? { bio: inboxMsg.fromBio } : {}),
+              ...(inboxMsg.fromName ? { name: inboxMsg.fromName } : {}),
+              address: senderAddr,
+            }));
           }
         } catch { /* ignore */ }
 
@@ -176,6 +185,7 @@ export function useInboxPoll({
               name,
               avatar: name.slice(0, 2).toUpperCase(),
               avatarUrl: senderAvatarUrl || null,
+              bio: senderBio || '',
               color: COLORS[i],
               bg: BGS[i],
               online: true,
@@ -186,7 +196,9 @@ export function useInboxPoll({
             updated = prev.map(c =>
               normalizeAddress(c.address) === senderAddr
                 ? { ...c, preview: previewText(inboxMsg), unread: (c.unread ?? 0) + 1,
-                    ...(senderAvatarUrl ? { avatarUrl: senderAvatarUrl } : {}) }
+                    ...(senderAvatarUrl ? { avatarUrl: senderAvatarUrl } : {}),
+                    ...(senderBio ? { bio: senderBio } : {}),
+                    ...(inboxMsg.fromName ? { name: inboxMsg.fromName } : {}) }
                 : c
             );
           }
