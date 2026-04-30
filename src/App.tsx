@@ -385,16 +385,17 @@ export default function App() {
         const inboxMsg = { id: msg.id, type: msg.type, text: msgContent, ...(isVoice && { duration: (input as Message).duration, waveform: (input as Message).waveform, audioMsgId: (input as Message).audioMsgId, ipfsCid: (input as Message).ipfsCid, ipfsUrl: (input as Message).ipfsUrl }), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
         const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
         localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
-        // Also deliver via cross-device API relay (fire-and-forget)
+        // Also deliver via cross-device API relay
+        console.log('[PMT relay] POSTing to', toAddr.slice(0,10));
         fetch(`/api/inbox?address=${toAddr}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(inboxMsg),
         }).then(r => {
+          console.log('[PMT relay] POST status:', r.status);
           if (!r.ok) console.warn('[PMT relay] POST failed:', r.status);
         }).catch(e => {
           console.warn('[PMT relay] POST error:', e?.message);
-          // Retry once after 2 seconds
           setTimeout(() => {
             fetch(`/api/inbox?address=${toAddr}`, {
               method: 'POST',
