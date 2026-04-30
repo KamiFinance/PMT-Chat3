@@ -1,41 +1,22 @@
-// Cross-device message relay — ioredis with serverless-safe connection handling
+// Cross-device message relay using ioredis + KV_REDIS_URL
+// Key: pmt:inbox:{address} — stores messages for that address
+// Key: pmt:online:{address} — stores last-seen timestamp + username
+
+import Redis from 'ioredis';
 
 let _redis = null;
-let _connecting = false;
 
-async function getRedis() {
-  const { default: Redis } = await import('ioredis');
+function getRedis() {
   const url = process.env.KV_REDIS_URL;
   if (!url) return null;
-
-  // Reuse connection if healthy
-  if (_redis && (_redis.status === 'ready' || _redis.status === 'connect')) {
-    return _redis;
-  }
-
-  // Create new connection
+  if (_redis && (_redis.status === 'ready' || _redis.status === 'connect')) return _redis;
   if (_redis) { try { _redis.disconnect(); } catch {} }
-
   _redis = new Redis(url, {
-    maxRetriesPerRequest: 2,
-    retryStrategy: (times) => (times > 2 ? null : 100),
-    connectTimeout: 6000,
-    commandTimeout: 6000,
-    enableOfflineQueue: true,
-    lazyConnect: false,
+    maxRetriesPerRequest: 1, connectTimeout: 5000, commandTimeout: 5000,
+    enableOfflineQueue: true, lazyConnect: false,
     tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-    // Redis Cloud requires TLS even on redis:// sometimes
   });
-  _redis.on('error', (e) => { console.error('[inbox redis error]', e.message); });
-
-  // Wait for ready or error
-  await new Promise((resolve, reject) => {
-    if (_redis.status === 'ready') return resolve();
-    const timeout = setTimeout(() => reject(new Error('Redis connect timeout')), 6000);
-    _redis.once('ready', () => { clearTimeout(timeout); resolve(); });
-    _redis.once('error', (e) => { clearTimeout(timeout); reject(e); });
-  });
-
+  _redis.on('error', () => { _redis = null; });
   return _redis;
 }
 
@@ -53,26 +34,53 @@ export default async function handler(req, res) {
 
   const urlObj = new URL(req.url, `http://${req.headers.host}`);
   const address = (urlObj.searchParams.get('address') || '').toLowerCase().slice(0, 66);
-  if (!address) { res.status(400).json({ error: 'address required' }); return; }
+  const username = (urlObj.searchParams.get('username') || '').toLowerCase().trim();
 
-  let r;
-  try {
-    r = await getRedis();
-  } catch (e) {
-    console.error('[inbox] connect failed:', e.message);
-    if (req.method === 'GET') return res.status(200).json([]);
-    return res.status(200).json({ ok: true, relay: 'disabled', reason: e.message });
-  }
+  if (!address && !username) { res.status(400).json({ error: 'address or username required' }); return; }
 
+  const r = getRedis();
   if (!r) {
     if (req.method === 'GET') return res.status(200).json([]);
     return res.status(200).json({ ok: true, relay: 'disabled' });
   }
 
-  const key = `pmt:${address}`;
+  // Wait for Redis ready
+  if (r.status !== 'ready') {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('timeout')), 4000);
+      r.once('ready', () => { clearTimeout(t); resolve(); });
+      r.once('error', (e) => { clearTimeout(t); reject(e); });
+    }).catch(() => {});
+  }
+
+  // If username provided, resolve to current address
+  let resolvedAddress = address;
+  if (username && !address) {
+    try {
+      const raw = await r.get(`pmt:user:${username}`);
+      if (raw) {
+        const user = JSON.parse(raw);
+        resolvedAddress = user.address?.toLowerCase();
+      }
+    } catch {}
+  }
+
+  if (!resolvedAddress) {
+    if (req.method === 'GET') return res.status(200).json([]);
+    return res.status(404).json({ error: 'user not found' });
+  }
+
+  const key = `pmt:inbox:${resolvedAddress}`;
 
   try {
     if (req.method === 'GET') {
+      // Register heartbeat: address → username mapping
+      if (address) {
+        try {
+          if (username) await r.set(`pmt:addr:${address}`, username, 'EX', 86400);
+          await r.set(`pmt:online:${address}`, Date.now(), 'EX', 3600);
+        } catch {}
+      }
       const msgs = await r.lrange(key, 0, -1);
       if (msgs.length > 0) await r.del(key);
       const parsed = msgs.map(m => { try { return JSON.parse(m); } catch { return null; } }).filter(Boolean);
@@ -82,15 +90,36 @@ export default async function handler(req, res) {
       let body = '';
       await new Promise(resolve => { req.on('data', c => body += c); req.on('end', resolve); });
       const msg = JSON.parse(body);
+
+      // If recipient username known, also deliver to their current registered address
+      const toUsername = msg.toUsername;
+      let deliveredTo = [resolvedAddress];
+
+      if (toUsername) {
+        try {
+          const raw = await r.get(`pmt:user:${toUsername.toLowerCase()}`);
+          if (raw) {
+            const user = JSON.parse(raw);
+            const currentAddr = user.address?.toLowerCase();
+            if (currentAddr && currentAddr !== resolvedAddress) {
+              // Deliver to both old address and current registered address
+              await r.rpush(`pmt:inbox:${currentAddr}`, JSON.stringify(msg));
+              await r.expire(`pmt:inbox:${currentAddr}`, 604800);
+              deliveredTo.push(currentAddr);
+            }
+          }
+        } catch {}
+      }
+
       await r.rpush(key, JSON.stringify(msg));
       await r.expire(key, 604800);
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, deliveredTo });
 
     } else {
       res.status(405).end();
     }
   } catch (e) {
-    console.error('[inbox] command error:', e.message);
+    console.error('[inbox]', e.message);
     if (req.method === 'GET') return res.status(200).json([]);
     return res.status(500).json({ error: e.message });
   }

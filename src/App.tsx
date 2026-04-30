@@ -391,6 +391,8 @@ export default function App() {
         hash: msg.hash,
         confirms: 0,
         ts: Date.now(),
+        // Include recipient username so server can find their current address
+        toUsername: activeRef.current.username || null,
       };
       if (isVoice) {
         inboxMsg.duration = (input as Message).duration;
@@ -415,7 +417,8 @@ export default function App() {
       // Cross-device delivery via API relay
       try {
         const body = JSON.stringify(inboxMsg);
-        fetch(`/api/inbox?address=${toAddr}`, {
+        const toUname = activeRef.current.username ? `&username=${encodeURIComponent(activeRef.current.username)}` : '';
+        fetch(`/api/inbox?address=${toAddr}${toUname}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,

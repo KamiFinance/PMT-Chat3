@@ -221,7 +221,8 @@ export function useInboxPoll({
   const processApiInbox = useCallback(async () => {
     if (!wallet?.address) return;
     try {
-      const res = await fetch(`/api/inbox?address=${wallet.address.toLowerCase()}&t=${Date.now()}`);
+      const uname = wallet.username ? `&username=${encodeURIComponent(wallet.username)}` : '';
+      const res = await fetch(`/api/inbox?address=${wallet.address.toLowerCase()}${uname}&t=${Date.now()}`);
       if (!res.ok) return;
       const msgs: InboxMessage[] = await res.json();
       if (!msgs.length) return;
