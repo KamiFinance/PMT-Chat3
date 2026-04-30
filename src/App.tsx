@@ -117,6 +117,8 @@ export default function App() {
   const [active, setActive] = useState<Contact | null>(null);
   const activeRef = useRef<Contact | null>(null);
   const walletRef = useRef<Wallet | null>(null);
+  // Session password — kept in memory only, never persisted, used for auto cloud backup
+  const sessionPasswordRef = useRef<string | null>(null);
   const profileRef = useRef<Profile>({ name: '', bio: '', avatarUrl: null, address: null });
 
   const setActiveAndRef = useCallback((c: Contact | null) => {
@@ -208,26 +210,37 @@ export default function App() {
     storage.setMsgs(accountKey, msgs);
   }, [msgs, accountKey]);
 
-  // Auto cloud backup: triggered whenever contacts or messages change
-  // Uses the stored IPFS CID to update — only works for username/password accounts
-  // NOTE: we can't re-derive the password here (zero-knowledge design).
-  // Instead, we save a "pending backup" flag and the CreateWalletFlow/LoginScreen
-  // do the actual upload when password is available.
-  // The CID in Redis is updated on next login or explicit save.
-  // For now: store latest data in localStorage so restore is always fresh.
+  // Auto cloud backup — saves encrypted backup to IPFS whenever contacts or messages change.
+  // Debounced 8s to avoid hammering on rapid message receipt.
+  // Password is held in sessionPasswordRef (memory only, never persisted).
   useEffect(() => {
     if (!wallet?.address || isDemo) return;
-    const accountKey = `pmt_account_${wallet.address.toLowerCase()}`;
-    const stored = localStorage.getItem(accountKey);
-    if (!stored) return;
-    try {
-      const account = JSON.parse(stored);
-      if (!account.username) return; // MetaMask wallet — no backup needed
-      // Persist latest contacts + messages into account store for next backup trigger
-      const updated = { ...account, lastContactsSnapshot: contacts.length, lastMsgsSnapshot: Date.now() };
-      localStorage.setItem(accountKey, JSON.stringify(updated));
-    } catch { /* ignore */ }
-  }, [contacts, msgs, wallet?.address, isDemo]);
+    if (!sessionPasswordRef.current) return; // no password in memory (MetaMask user)
+    const username = wallet.username;
+    if (!username) return; // MetaMask wallet — no backup needed
+    const timer = setTimeout(async () => {
+      try {
+        const password = sessionPasswordRef.current;
+        if (!password) return;
+        // Strip binary blobs from messages before backup (keep metadata + IPFS CIDs)
+        const cleanMsgs: Record<string, object[]> = {};
+        Object.entries(msgs).forEach(([addr, arr]) => {
+          cleanMsgs[addr] = (arr as any[]).map(m => {
+            const { b64Data, audioUrl, fileUrl, imgData, fileData, uploading, _toAddr, ...keep } = m;
+            // Keep IPFS references so media can be re-fetched on restore
+            return keep;
+          });
+        });
+        await saveCloudBackup(username, password, {
+          wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
+          contacts,
+          messages: cleanMsgs,
+          profile: profileRef.current ?? {},
+        });
+      } catch { /* offline or Pinata unavailable — silent */ }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [contacts, msgs, wallet?.address, wallet?.username, isDemo]);
 
   const pushNotif = useCallback((contact: Contact, text: string) => {
     const id = uid();
@@ -448,9 +461,11 @@ export default function App() {
     if (accountKey) storage.setProfile(accountKey, np);
   }, [accountKey]);
 
-  const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
+  const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any; sessionPassword?: string }) => {
     setWallet(w);
     walletRef.current = w;
+    // Keep password in memory for auto cloud backup (never stored to localStorage)
+    if (w.sessionPassword) sessionPasswordRef.current = w.sessionPassword;
     // If cloud restore: seed contacts and messages
     if (w.restoredContacts?.length) {
       setContacts(w.restoredContacts);

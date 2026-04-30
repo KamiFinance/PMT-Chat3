@@ -35,7 +35,7 @@ export default function LoginScreen({onLogin,onBack}){
         const walletData=await PMTAuth.decryptWallet(account.encryptedWallet,password);
         localStorage.setItem('pmt_session',JSON.stringify({username:account.username,address:account.address}));
         onLogin({address:walletData.address,privateKey:walletData.privateKey,
-          balance:'0.0000',network:'PMT Chain',username:account.username});
+          balance:'0.0000',network:'PMT Chain',username:account.username,sessionPassword:password});
       } else {
         // Cloud restore: account not on this device — try IPFS backup
         setErr('Checking cloud backup…');
@@ -52,6 +52,7 @@ export default function LoginScreen({onLogin,onBack}){
         localStorage.setItem('pmt_session', JSON.stringify({username: username.trim().toLowerCase(), address: w.address}));
         onLogin({ address: w.address, privateKey: w.privateKey ?? '', balance:'0.0000',
           network:'PMT Chain', username: username.trim().toLowerCase(),
+          sessionPassword: password,
           restoredContacts: contacts ?? [],
           restoredMessages: messages ?? {},
           restoredProfile: profile ?? {} });
