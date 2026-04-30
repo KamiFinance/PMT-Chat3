@@ -375,28 +375,26 @@ export default function App() {
       const toAddr = normalizeAddress(activeRef.current.address);
       const msgContent = isVoice ? '🎙 Voice message' : isImage ? '🖼 Image' : isFile ? `📄 ${(input as Message).fileName ?? 'File'}` : input as string;
       const msgType = isVoice ? 'voice' : isImage ? 'image' : isFile ? 'file' : 'text';
+      // Build relay payload safely — separate from localStorage write
+      const inboxMsg: Record<string,unknown> = {
+        id: msg.id, type: msgType, text: msgContent,
+        from: w.address,
+        fromName: profileRef.current?.name || w.username || w.address.slice(0, 8),
+        fromAvatarUrl: profileRef.current?.avatarUrl ?? null,
+        fromBio: profileRef.current?.bio ?? '',
+        time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now(),
+      };
+      if (isVoice) { inboxMsg.duration = (input as Message).duration; inboxMsg.waveform = (input as Message).waveform; inboxMsg.audioMsgId = (input as Message).audioMsgId; inboxMsg.ipfsCid = (input as Message).ipfsCid; inboxMsg.ipfsUrl = (input as Message).ipfsUrl; }
+      if (isImage || isFile) { inboxMsg.mediaMsgId = (input as Message).mediaMsgId; inboxMsg.fileName = (input as Message).fileName; inboxMsg.fileSize = (input as Message).fileSize; inboxMsg.mimeType = (input as Message).mimeType; inboxMsg.ipfsCid = (input as Message).ipfsCid ?? null; }
+      // Same-device delivery
+      try { const ex: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]'); localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...ex, inboxMsg])); } catch {}
+      // Cross-device relay
       try {
-        const inboxMsg = { id: msg.id, type: msg.type, text: msgContent, ...(isVoice && { duration: (input as Message).duration, waveform: (input as Message).waveform, audioMsgId: (input as Message).audioMsgId, ipfsCid: (input as Message).ipfsCid, ipfsUrl: (input as Message).ipfsUrl }), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
-        const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
-        localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
-        // Also deliver via cross-device API relay (fire-and-forget)
         fetch(`/api/inbox?address=${toAddr}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(inboxMsg),
-        }).then(r => {
-          if (!r.ok) console.warn('[PMT relay] POST failed:', r.status);
-        }).catch(e => {
-          console.warn('[PMT relay] POST error:', e?.message);
-          // Retry once after 2 seconds
-          setTimeout(() => {
-            fetch(`/api/inbox?address=${toAddr}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(inboxMsg),
-            }).catch(() => {});
-          }, 2000);
-        });
+        }).catch(() => {});
       } catch {}
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
