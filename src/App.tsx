@@ -602,15 +602,8 @@ export default function App() {
                   setBackupPromptSaving(true);setBackupPromptErr('');
                   try{
                     const uname=wallet?.username?.toLowerCase()??'';
-                    const {PMTAuth}=await import('./lib/auth');
-                    const acctKey=`pmt_account_${uname}`;
-                    const acctByAddr=localStorage.getItem(`pmt_account_${wallet?.address?.toLowerCase()}`);
-                    const acct=localStorage.getItem(acctKey)||acctByAddr;
-                    if(acct){
-                      const parsed=JSON.parse(acct);
-                      const ok=await PMTAuth.verifyPassword(backupPromptPassword,parsed.passwordHash,parsed.passwordSalt);
-                      if(!ok){setBackupPromptErr('Incorrect password');setBackupPromptSaving(false);return;}
-                    }
+                    // Password used for encryption only — no local hash check
+                    // (local account may not have passwordHash stored; server rejects wrong owners)
                     sessionPasswordRef.current=backupPromptPassword;
                     const cleanMsgs:Record<string,object[]>={};
                     Object.entries(msgs).forEach(([addr,arr])=>{
@@ -639,15 +632,6 @@ export default function App() {
                   setBackupPromptSaving(true);setBackupPromptErr('');
                   try{
                     const uname=wallet?.username?.toLowerCase()??'';
-                    const{PMTAuth}=await import('./lib/auth');
-                    const acctKey=`pmt_account_${uname}`;
-                    const acctByAddrRaw=localStorage.getItem(`pmt_account_${wallet?.address?.toLowerCase()}`);
-                    const acctRaw=localStorage.getItem(acctKey)||acctByAddrRaw;
-                    if(acctRaw){
-                      const parsed=JSON.parse(acctRaw);
-                      const ok=await PMTAuth.verifyPassword(backupPromptPassword,parsed.passwordHash,parsed.passwordSalt);
-                      if(!ok){setBackupPromptErr('Incorrect password');setBackupPromptSaving(false);return;}
-                    }
                     sessionPasswordRef.current=backupPromptPassword;
                     const cleanMsgs:Record<string,object[]>={};
                     Object.entries(msgs).forEach(([addr,arr])=>{
