@@ -83,7 +83,6 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
   const [showEmoji,setShowEmoji]=useState(false);
   const [recording,setRecording]=useState(false);
   const fileInputRef=useRef(null);
-  const attachBtnRef=useRef(null);
   const fileAcceptRef=useRef('*');
   const [recordSeconds,setRecordSeconds]=useState(0);
   const recordSecondsRef=useRef(0); // ref to avoid stale closure in onstop
@@ -149,8 +148,14 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
     return (bytes/(1024*1024)).toFixed(1)+'MB';
   };
 
-  // handleFile receives a File object directly from AttachMenu (no programmatic .click())
-  const handleFile=(file)=>{
+  const openFilePicker=(accept)=>{
+    fileAcceptRef.current=accept;
+    fileInputRef.current.accept=accept;
+    fileInputRef.current.click();
+  };
+
+  const handleFileChosen=e=>{
+    const file=e.target.files[0];
     if(!file)return;
     const localUrl=URL.createObjectURL(file);
     const isImage=file.type.startsWith('image/');
@@ -181,6 +186,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
         });
     };
     reader.readAsDataURL(file);
+    e.target.value='';
   };
   const key=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
 
@@ -389,16 +395,16 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
             ):(
               <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
                 <div style={{position:'relative'}}>
-                  <button ref={attachBtnRef} onClick={()=>setShowAttach(v=>!v)}
+                  <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileChosen}/>
+                  <button data-attach="true" onClick={()=>setShowAttach(v=>!v)}
                     style={{width:44,height:44,background:showAttach?'var(--surface2)':'var(--surface)',
                       border:`1px solid ${showAttach?'var(--accent)':'var(--border)'}`,
                       borderRadius:9,color:showAttach?'var(--accent)':'var(--muted)',fontSize:18,
                       display:'flex',alignItems:'center',justifyContent:'center',
                       flexShrink:0,cursor:'pointer',transition:'all .15s'}}>📎</button>
                   {showAttach&&<AttachMenu
-                    onImage={handleFile}
-                    onFile={handleFile}
-                    anchorRect={attachBtnRef.current?.getBoundingClientRect()}
+                    onImage={accept=>openFilePicker(accept)}
+                    onFile={accept=>openFilePicker(accept)}
                     onClose={()=>setShowAttach(false)}/>}
                 </div>
                 <div style={{position:'relative'}}>
