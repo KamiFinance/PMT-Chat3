@@ -83,6 +83,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
   const [showEmoji,setShowEmoji]=useState(false);
   const [recording,setRecording]=useState(false);
   const fileInputRef=useRef(null);
+  const attachBtnRef=useRef(null);
   const fileAcceptRef=useRef('*');
   const [recordSeconds,setRecordSeconds]=useState(0);
   const recordSecondsRef=useRef(0); // ref to avoid stale closure in onstop
@@ -388,7 +389,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
             ):(
               <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
                 <div style={{position:'relative'}}>
-                  <button onClick={()=>setShowAttach(v=>!v)}
+                  <button ref={attachBtnRef} onClick={()=>setShowAttach(v=>!v)}
                     style={{width:44,height:44,background:showAttach?'var(--surface2)':'var(--surface)',
                       border:`1px solid ${showAttach?'var(--accent)':'var(--border)'}`,
                       borderRadius:9,color:showAttach?'var(--accent)':'var(--muted)',fontSize:18,
@@ -397,6 +398,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
                   {showAttach&&<AttachMenu
                     onImage={handleFile}
                     onFile={handleFile}
+                    anchorRect={attachBtnRef.current?.getBoundingClientRect()}
                     onClose={()=>setShowAttach(false)}/>}
                 </div>
                 <div style={{position:'relative'}}>

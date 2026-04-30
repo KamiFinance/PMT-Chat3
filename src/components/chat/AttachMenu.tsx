@@ -4,7 +4,12 @@ import React from 'react';
 // Each item wraps a hidden <input type="file"> in a <label>.
 // The user's click on the label directly activates the input —
 // no programmatic .click() needed, so browsers never block it.
-export default function AttachMenu({onImage, onFile, onClose}) {
+export default function AttachMenu({onImage, onFile, onClose, anchorRect}) {
+  // Use position:fixed so the menu escapes the chat scroll container stacking context.
+  // anchorRect is the getBoundingClientRect() of the trigger button.
+  const bottom = anchorRect ? window.innerHeight - anchorRect.top + 6 : 120;
+  const left   = anchorRect ? anchorRect.left : 60;
+
   const items = [
     { icon: '🖼', label: 'Image / Photo',  accept: 'image/*',                                              cb: onImage },
     { icon: '📄', label: 'Document',       accept: '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar',        cb: onFile  },
@@ -13,10 +18,10 @@ export default function AttachMenu({onImage, onFile, onClose}) {
   ];
 
   return (
-    <div style={{position:'absolute',bottom:'100%',left:0,marginBottom:6,
+    <div style={{position:'fixed',bottom,left,
       background:'var(--panel)',border:'1px solid var(--border)',
       borderRadius:12,padding:8,display:'flex',flexDirection:'column',gap:4,
-      zIndex:50,boxShadow:'0 8px 32px rgba(0,0,0,.4)',minWidth:180,
+      zIndex:9999,boxShadow:'0 8px 32px rgba(0,0,0,.4)',minWidth:180,
       animation:'fadeIn .15s ease'}}>
       <div style={{fontSize:10,color:'var(--muted)',fontFamily:'var(--mono)',
         letterSpacing:'1px',padding:'4px 8px 6px'}}>ATTACH</div>
