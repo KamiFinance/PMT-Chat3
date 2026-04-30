@@ -37,39 +37,15 @@ async function decryptBackup(blob: string, password: string, salt: string): Prom
 // ── Pinata upload/download ───────────────────────────────────────────────────
 
 async function uploadToIPFS(content: string): Promise<string> {
-  // Get JWT from multiple possible sources
-  const jwt = localStorage.getItem('pmt_pinata_jwt') || (import.meta.env as any)?.VITE_PINATA_JWT || '';
+  const { uploadToPinata } = await import('./pinata');
   const blob = new Blob([content], { type: 'application/json' });
-  const form = new FormData();
-  form.append('file', blob, 'pmt_backup.json');
-  form.append('pinataOptions', JSON.stringify({ cidVersion: 1 }));
-  form.append('pinataMetadata', JSON.stringify({ name: 'pmt_backup_' + Date.now() }));
-  const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${jwt}` },
-    body: form,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Pinata upload failed: ${res.status} ${err.slice(0, 100)}`);
-  }
-  const data = await res.json();
-  return data.IpfsHash as string;
+  return uploadToPinata(blob, 'pmt_backup_' + Date.now() + '.json');
 }
 
 async function fetchFromIPFS(cid: string): Promise<string> {
-  const gateways = [
-    `https://gateway.pinata.cloud/ipfs/${cid}`,
-    `https://ipfs.io/ipfs/${cid}`,
-    `https://cloudflare-ipfs.com/ipfs/${cid}`,
-  ];
-  for (const url of gateways) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) return await res.text();
-    } catch { /* try next */ }
-  }
-  throw new Error('Failed to fetch backup from IPFS');
+  const { fetchFromIpfs } = await import('./pinata');
+  const res = await fetchFromIpfs(cid);
+  return res.text();
 }
 
 // ── Registry API calls ───────────────────────────────────────────────────────

@@ -26,17 +26,38 @@ export default function LoginScreen({onLogin,onBack}){
     try{
       const key='pmt_account_'+username.trim().toLowerCase();
       const stored=localStorage.getItem(key);
-      if(!stored){setLoading(false);return setErr('Account not found. Check your username or create a new wallet.');}
-      const account=JSON.parse(stored);
-      const ok=await PMTAuth.verifyPassword(password,account.passwordHash,account.passwordSalt);
-      if(!ok)return setErr('Incorrect password. Please try again.');
-      // Decrypt wallet
-      const walletData=await PMTAuth.decryptWallet(account.encryptedWallet,password);
-      localStorage.setItem('pmt_session',JSON.stringify({username:account.username,address:account.address}));
-      onLogin({address:walletData.address,privateKey:walletData.privateKey,
-        balance:'0.0000',network:'PMT Chain',username:account.username});
+
+      if(stored){
+        // Fast path: local account exists
+        const account=JSON.parse(stored);
+        const ok=await PMTAuth.verifyPassword(password,account.passwordHash,account.passwordSalt);
+        if(!ok)return setErr('Incorrect password. Please try again.');
+        const walletData=await PMTAuth.decryptWallet(account.encryptedWallet,password);
+        localStorage.setItem('pmt_session',JSON.stringify({username:account.username,address:account.address}));
+        onLogin({address:walletData.address,privateKey:walletData.privateKey,
+          balance:'0.0000',network:'PMT Chain',username:account.username});
+      } else {
+        // Cloud restore: account not on this device — try IPFS backup
+        setErr('Checking cloud backup…');
+        const backup = await loadCloudBackup(username.trim(), password);
+        if(!backup) return setErr('Account not found. Check your username or create a new wallet.');
+        const { wallet: w, contacts, messages, profile } = backup;
+        // Save locally for fast future logins (re-encrypt with same password)
+        const { hash: passwordHash, salt: passwordSalt } = await PMTAuth.hashPassword(password);
+        const encryptedWallet = await PMTAuth.encryptWallet({ address: w.address, privateKey: w.privateKey ?? '' }, password);
+        localStorage.setItem('pmt_account_'+username.trim().toLowerCase(), JSON.stringify({
+          username: username.trim().toLowerCase(), address: w.address,
+          passwordHash, passwordSalt, encryptedWallet
+        }));
+        localStorage.setItem('pmt_session', JSON.stringify({username: username.trim().toLowerCase(), address: w.address}));
+        onLogin({ address: w.address, privateKey: w.privateKey ?? '', balance:'0.0000',
+          network:'PMT Chain', username: username.trim().toLowerCase(),
+          restoredContacts: contacts ?? [],
+          restoredMessages: messages ?? {},
+          restoredProfile: profile ?? {} });
+      }
     }catch(e){
-      if(e.message?.includes('decrypt')||e.name==='OperationError')
+      if(e.message==='WRONG_PASSWORD'||e.message?.includes('decrypt')||e.name==='OperationError')
         setErr('Incorrect password.');
       else setErr('Login failed: '+e.message);
     }finally{setLoading(false);}

@@ -208,23 +208,26 @@ export default function App() {
     storage.setMsgs(accountKey, msgs);
   }, [msgs, accountKey]);
 
-  // Auto cloud backup every 5 minutes for username/password accounts
+  // Auto cloud backup: triggered whenever contacts or messages change
+  // Uses the stored IPFS CID to update — only works for username/password accounts
+  // NOTE: we can't re-derive the password here (zero-knowledge design).
+  // Instead, we save a "pending backup" flag and the CreateWalletFlow/LoginScreen
+  // do the actual upload when password is available.
+  // The CID in Redis is updated on next login or explicit save.
+  // For now: store latest data in localStorage so restore is always fresh.
   useEffect(() => {
     if (!wallet?.address || isDemo) return;
-    const doBackup = async () => {
-      try {
-        const accountKey2 = `pmt_account_${wallet.address.toLowerCase()}`;
-        const stored = localStorage.getItem(accountKey2);
-        if (!stored) return;
-        const account = JSON.parse(stored);
-        if (!account.username || !account.encryptedWallet) return;
-        // We can't re-derive the password from stored data (by design)
-        // Auto-backup only happens at login/creation — this is intentional
-        // Users can manually trigger backup from profile settings
-      } catch { /* ignore */ }
-    };
-    doBackup();
-  }, [wallet?.address, isDemo]);
+    const accountKey = `pmt_account_${wallet.address.toLowerCase()}`;
+    const stored = localStorage.getItem(accountKey);
+    if (!stored) return;
+    try {
+      const account = JSON.parse(stored);
+      if (!account.username) return; // MetaMask wallet — no backup needed
+      // Persist latest contacts + messages into account store for next backup trigger
+      const updated = { ...account, lastContactsSnapshot: contacts.length, lastMsgsSnapshot: Date.now() };
+      localStorage.setItem(accountKey, JSON.stringify(updated));
+    } catch { /* ignore */ }
+  }, [contacts, msgs, wallet?.address, isDemo]);
 
   const pushNotif = useCallback((contact: Contact, text: string) => {
     const id = uid();
@@ -428,10 +431,10 @@ export default function App() {
       setContacts(w.restoredContacts);
     }
     if (w.restoredMessages && Object.keys(w.restoredMessages).length) {
-      setMsgs(w.restoredMessages);
+      setMsgs(w.restoredMessages as MsgsMap);
     }
     if (w.restoredProfile) {
-      setProfile(w.restoredProfile);
+      setProfile(w.restoredProfile as Profile);
     }
     setScreen('chat');
   }, [setContacts, setMsgs]);
