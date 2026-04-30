@@ -7,12 +7,14 @@ import Avatar from '../ui/Avatar';
 export default function VoiceBubble({msg,isOut,contact}){
   const [playing,setPlaying]=useState(false);
   const [progress,setProgress]=useState(0);
+  const [audioError,setAudioError]=useState(false);
   const audioRef=useRef(null);
 
-  // Try to get audioUrl — from msg directly, or reconstruct from audioMsgId
-  const [audioUrl,setAudioUrl]=useState(msg.audioUrl||null);
+  // msg.audioUrl is a blob URL valid only on the sender's device — skip it for incoming msgs
+  const [audioUrl,setAudioUrl]=useState(isOut?(msg.audioUrl||null):null);
   useEffect(()=>{
-    if(audioUrl)return;
+    // Outgoing: sender always has the blob directly
+    if(isOut&&msg.audioUrl){setAudioUrl(msg.audioUrl);return;}
     // Try IPFS first
     if(msg.ipfsCid){
       setAudioUrl(getIpfsUrl(msg.ipfsCid)||('https://ipfs.io/ipfs/'+msg.ipfsCid));
@@ -41,14 +43,19 @@ export default function VoiceBubble({msg,isOut,contact}){
       for(let i=0;i<dec.length;i++) bytes[i]=dec.charCodeAt(i);
       setAudioUrl(URL.createObjectURL(new Blob([bytes],{type:mime})));
     }catch(e){}
-  },[msg.audioMsgId,msg.ipfsCid,msg.ipfsUrl,(msg as any).audioB64]);
+  },[msg.audioMsgId,msg.ipfsCid,msg.ipfsUrl,(msg as any).audioB64,isOut,msg.audioUrl]);
 
-  const hasAudio=!!audioUrl;
+  const hasAudio=!!audioUrl&&!audioError;
   const toggle=()=>{
     if(!hasAudio||!audioRef.current)return;
-    if(playing){audioRef.current.pause();}
-    else{audioRef.current.play();}
-    setPlaying(!playing);
+    if(playing){audioRef.current.pause();setPlaying(false);}
+    else{
+      // play() returns a Promise — catch rejection (format unsupported, network, iOS restrictions)
+      const p=audioRef.current.play();
+      if(p&&typeof p.then==='function'){
+        p.then(()=>setPlaying(true)).catch(()=>{setAudioError(true);setPlaying(false);});
+      } else { setPlaying(true); }
+    }
   };
 
   useEffect(()=>{
@@ -56,10 +63,12 @@ export default function VoiceBubble({msg,isOut,contact}){
     if(!a)return;
     const onTime=()=>setProgress((a.currentTime/a.duration)*100||0);
     const onEnd=()=>{setPlaying(false);setProgress(0);};
+    const onErr=()=>{setAudioError(true);setPlaying(false);};
     a.addEventListener('timeupdate',onTime);
     a.addEventListener('ended',onEnd);
-    return()=>{a.removeEventListener('timeupdate',onTime);a.removeEventListener('ended',onEnd);};
-  },[]);
+    a.addEventListener('error',onErr);
+    return()=>{a.removeEventListener('timeupdate',onTime);a.removeEventListener('ended',onEnd);a.removeEventListener('error',onErr);};
+  },[audioUrl]);
 
   const bars=msg.waveform||Array.from({length:30},(_,i)=>0.2+Math.abs(Math.sin(i*0.8+(msg.id||0)))*0.8);
   const dur=msg.duration||0;
@@ -78,14 +87,14 @@ export default function VoiceBubble({msg,isOut,contact}){
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           {/* Play button */}
           <button onClick={toggle}
-            title={hasAudio?'Play':'🔒 E2E encrypted — audio only on sender device'}
+            title={audioError?'Audio format not supported on this device':hasAudio?'Play':'🔒 E2E encrypted — audio only on sender device'}
             style={{width:36,height:36,borderRadius:'50%',
-              background:hasAudio?(isOut?'var(--accent)':'var(--accent2)'):'rgba(255,255,255,.1)',
-              border:hasAudio?'none':'1px solid rgba(255,255,255,.2)',
+              background:audioError?'rgba(255,80,80,.15)':hasAudio?(isOut?'var(--accent)':'var(--accent2)'):'rgba(255,255,255,.1)',
+              border:audioError?'1px solid rgba(255,80,80,.4)':hasAudio?'none':'1px solid rgba(255,255,255,.2)',
               display:'flex',alignItems:'center',justifyContent:'center',
               cursor:hasAudio?'pointer':'default',flexShrink:0,fontSize:14,
-              color:hasAudio?'#0a0c14':'var(--muted)',opacity:hasAudio?1:0.7}}>
-            {playing?'⏸':'▶'}
+              color:audioError?'rgba(255,80,80,.9)':hasAudio?'#0a0c14':'var(--muted)',opacity:audioError?0.9:hasAudio?1:0.7}}>
+            {audioError?'⚠️':playing?'⏸':'▶'}
           </button>
           {/* Waveform */}
           <div style={{flex:1,display:'flex',alignItems:'center',gap:1.5,height:32,position:'relative'}}>
