@@ -113,10 +113,9 @@ export function useInboxPoll({
             Object.keys(updated).forEach(addr => {
               updated[addr] = (updated[addr] ?? []).map(m => {
                 if (m.id !== inboxMsg.msgId) return m;
-                const reactions = { ...(m.reactions ?? {}) };
-                const emoji = inboxMsg.emoji ?? '';
-                reactions[emoji] = (reactions[emoji] ?? 0) === 1 ? 0 : 1;
-                return { ...m, reactions };
+                // Merge incoming reactions: keep our own reactions, apply sender's
+                const merged = { ...(m.reactions ?? {}), ...(inboxMsg.reactions ?? {}) };
+                return { ...m, reactions: merged };
               });
             });
             return updated;

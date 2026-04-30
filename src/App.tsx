@@ -288,11 +288,19 @@ export default function App() {
           const reactions = { ...(m.reactions ?? {}) };
           reactions[emoji] = (reactions[emoji] ?? 0) === 1 ? 0 : 1;
           if (!isDemo && walletRef.current?.address) {
+            const rxnMsg = { id: `rxn_${Date.now()}`, type: 'reaction', msgId, emoji, reactions, from: walletRef.current.address, ts: Date.now() };
+            // Same-device delivery via localStorage
             try {
               const inbox: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(addr)) ?? '[]');
-              inbox.push({ id: `rxn_${Date.now()}`, type: 'reaction', msgId, emoji, reactions, from: walletRef.current.address, ts: Date.now() });
+              inbox.push(rxnMsg);
               localStorage.setItem(STORAGE_KEYS.inbox(addr), JSON.stringify(inbox));
             } catch {}
+            // Cross-device delivery via relay API
+            fetch(`/api/inbox?address=${addr}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rxnMsg),
+            }).catch(() => {});
           }
           return { ...m, reactions };
         }),
