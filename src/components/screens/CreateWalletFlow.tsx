@@ -92,9 +92,9 @@ export default function CreateWalletFlow({onWallet,onBack}){
         setCloudStatus('error');
       }
 
-      // Store by username (lowercase) for login lookup
-      const key='pmt_account_'+username.trim().toLowerCase();
-      localStorage.setItem(key,JSON.stringify(account));
+      // Store under both username and address key so backup salt lookup works either way
+      localStorage.setItem('pmt_account_'+username.trim().toLowerCase(), JSON.stringify(account));
+      localStorage.setItem('pmt_account_'+wallet.address.toLowerCase(), JSON.stringify(account));
       // Also store current session (unencrypted for active session only)
       localStorage.setItem('pmt_session',JSON.stringify({username:username.trim(),address:wallet.address}));
       // Small delay to show "saved" status before navigating

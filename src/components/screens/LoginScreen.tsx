@@ -42,13 +42,17 @@ export default function LoginScreen({onLogin,onBack}){
         const backup = await loadCloudBackup(username.trim(), password);
         if(!backup) return setErr('Account not found. Check your username or create a new wallet.');
         const { wallet: w, contacts, messages, profile } = backup;
-        // Save locally for fast future logins (re-encrypt with same password)
-        const { hash: passwordHash, salt: passwordSalt } = await PMTAuth.hashPassword(password);
+        // Use the canonical salt from Redis so future backups produce the same passwordHash
+        const canonicalSalt = (backup as any)._canonicalSalt;
+        const canonicalHash = (backup as any)._passwordHash;
+        const { hash: passwordHash, salt: passwordSalt } = canonicalSalt
+          ? { hash: canonicalHash, salt: canonicalSalt }
+          : await PMTAuth.hashPassword(password);
         const encryptedWallet = await PMTAuth.encryptWallet({ address: w.address, privateKey: w.privateKey ?? '' }, password);
-        localStorage.setItem('pmt_account_'+username.trim().toLowerCase(), JSON.stringify({
-          username: username.trim().toLowerCase(), address: w.address,
-          passwordHash, passwordSalt, encryptedWallet
-        }));
+        // Store under BOTH username key and address key for reliable lookup
+        const acctData = { username: username.trim().toLowerCase(), address: w.address, passwordHash, passwordSalt, encryptedWallet };
+        localStorage.setItem('pmt_account_'+username.trim().toLowerCase(), JSON.stringify(acctData));
+        localStorage.setItem('pmt_account_'+w.address.toLowerCase(), JSON.stringify(acctData));
         localStorage.setItem('pmt_session', JSON.stringify({username: username.trim().toLowerCase(), address: w.address}));
         onLogin({ address: w.address, privateKey: w.privateKey ?? '', balance:'0.0000',
           network:'PMT Chain', username: username.trim().toLowerCase(),

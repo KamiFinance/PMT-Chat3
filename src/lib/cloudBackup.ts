@@ -54,10 +54,14 @@ export async function saveCloudBackup(
 ): Promise<void> {
   const uname = username.toLowerCase().trim();
 
-  // Reuse existing salt so passwordHash stays consistent (lets server verify ownership)
-  const accountKey = `pmt_account_${uname}`;
-  const stored = localStorage.getItem(accountKey);
-  const existingSalt = stored ? (JSON.parse(stored).passwordSalt ?? null) : null;
+  // Reuse existing salt so passwordHash stays consistent (lets server verify ownership).
+  // Account may be stored under username key OR address key — check both.
+  const byUsername = localStorage.getItem(`pmt_account_${uname}`);
+  const byAddress = data.wallet.address
+    ? localStorage.getItem(`pmt_account_${data.wallet.address.toLowerCase()}`)
+    : null;
+  const accountData = byUsername ? JSON.parse(byUsername) : byAddress ? JSON.parse(byAddress) : null;
+  const existingSalt = accountData?.passwordSalt ?? accountData?.salt ?? null;
 
   const { hash: passwordHash, salt } = await PMTAuth.hashPassword(password, existingSalt ?? undefined);
 
@@ -101,6 +105,10 @@ export async function loadCloudBackup(
   if (!record.encryptedBackup) return null; // old account — no backup yet
 
   const data = await decryptBackup(record.encryptedBackup, password, record.salt) as BackupData;
+  // Attach the canonical salt so LoginScreen can persist it locally —
+  // ensures future saveCloudBackup calls reuse the same salt → same passwordHash
+  (data as any)._canonicalSalt = record.salt;
+  (data as any)._passwordHash = record.passwordHash;
   return data;
 }
 
