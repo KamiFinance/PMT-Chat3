@@ -423,6 +423,7 @@ export default function App() {
   }, [accountKey]);
 
   const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
+    setIsDemo(false); // clear demo mode when real wallet logs in
     setWallet(w);
     walletRef.current = w;
     // If cloud restore: seed contacts and messages
@@ -454,6 +455,7 @@ export default function App() {
                 }
               } catch {}
 
+              setIsDemo(false); // always clear demo when real wallet connects
               if (savedAcct || sessMatch) {
                 // Returning user — go straight to chat
                 try {
