@@ -16,11 +16,23 @@ export default function EditContactModal({contact,onClose,onSave,onDelete}){
           <div style={{fontSize:17,fontWeight:600}}>Edit Contact</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--muted)',fontSize:20,cursor:'pointer'}}>×</button>
         </div>
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
           <div style={{width:68,height:68,borderRadius:'50%',background:contact.bg||'#1e2438',
             display:'flex',alignItems:'center',justifyContent:'center',
-            fontSize:22,fontWeight:700,color:contact.color||'var(--accent)'}}>
-            {(name||contact.avatar||'?').slice(0,2).toUpperCase()}
+            fontSize:22,fontWeight:700,color:contact.color||'var(--accent)',
+            overflow:'hidden',flexShrink:0}}>
+            {contact.avatarUrl
+              ? <img src={contact.avatarUrl} alt={name}
+                  style={{width:'100%',height:'100%',objectFit:'cover'}}
+                  onError={e=>{(e.target as HTMLImageElement).style.display='none';}}/>
+              : (name||contact.avatar||'?').slice(0,2).toUpperCase()}
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',
+            background:'rgba(99,210,255,.08)',border:'1px solid rgba(99,210,255,.25)',
+            borderRadius:20,fontFamily:'var(--mono)',fontSize:9,
+            color:'var(--accent)',letterSpacing:'1px'}}>
+            <div style={{width:5,height:5,borderRadius:'50%',background:'var(--accent3)'}}/>
+            PMT CHAIN USER
           </div>
         </div>
         {[['DISPLAY NAME',name,setName,'e.g. Alice or alice.eth'],

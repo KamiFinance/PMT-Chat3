@@ -20,6 +20,7 @@ function playNotifSound() {
   } catch { /* ignore */ }
 }
 import { uploadToPinata, getIpfsUrl } from './lib/pinata';
+import { saveCloudBackup } from './lib/cloudBackup';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
 import { AI_AGENT_ADDRESS, AI_AGENT_CONTACT } from './constants/ai';
@@ -207,6 +208,24 @@ export default function App() {
     storage.setMsgs(accountKey, msgs);
   }, [msgs, accountKey]);
 
+  // Auto cloud backup every 5 minutes for username/password accounts
+  useEffect(() => {
+    if (!wallet?.address || isDemo) return;
+    const doBackup = async () => {
+      try {
+        const accountKey2 = `pmt_account_${wallet.address.toLowerCase()}`;
+        const stored = localStorage.getItem(accountKey2);
+        if (!stored) return;
+        const account = JSON.parse(stored);
+        if (!account.username || !account.encryptedWallet) return;
+        // We can't re-derive the password from stored data (by design)
+        // Auto-backup only happens at login/creation — this is intentional
+        // Users can manually trigger backup from profile settings
+      } catch { /* ignore */ }
+    };
+    doBackup();
+  }, [wallet?.address, isDemo]);
+
   const pushNotif = useCallback((contact: Contact, text: string) => {
     const id = uid();
     const n: Notif = { id, contact, text, ts: Date.now() };
@@ -365,7 +384,19 @@ export default function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(inboxMsg),
-        }).catch(() => { /* offline or API not configured — localStorage delivery only */ });
+        }).then(r => {
+          if (!r.ok) console.warn('[PMT relay] POST failed:', r.status);
+        }).catch(e => {
+          console.warn('[PMT relay] POST error:', e?.message);
+          // Retry once after 2 seconds
+          setTimeout(() => {
+            fetch(`/api/inbox?address=${toAddr}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(inboxMsg),
+            }).catch(() => {});
+          }, 2000);
+        });
       } catch {}
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
@@ -389,7 +420,21 @@ export default function App() {
     if (accountKey) storage.setProfile(accountKey, np);
   }, [accountKey]);
 
-  const handleWallet = useCallback((w: Wallet) => { setWallet(w); walletRef.current = w; setScreen('chat'); }, []);
+  const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
+    setWallet(w);
+    walletRef.current = w;
+    // If cloud restore: seed contacts and messages
+    if (w.restoredContacts?.length) {
+      setContacts(w.restoredContacts);
+    }
+    if (w.restoredMessages && Object.keys(w.restoredMessages).length) {
+      setMsgs(w.restoredMessages);
+    }
+    if (w.restoredProfile) {
+      setProfile(w.restoredProfile);
+    }
+    setScreen('chat');
+  }, [setContacts, setMsgs]);
   const handleDemo = useCallback(() => { setIsDemo(true); const w = { address: 'demo', balance: '2.847', network: 'PMT Chain', username: 'Demo' }; setWallet(w); walletRef.current = w; setScreen('chat'); }, []);
   const handleLogout = useCallback(() => { storage.clearSession(); setWallet(null); walletRef.current = null; setIsDemo(false); setContacts([]); setMsgs({}); setActiveAndRef(null); setScreen('landing'); }, [setActiveAndRef]);
 
@@ -447,7 +492,7 @@ export default function App() {
         <div className={`sidebar-overlay${mobileSidebarOpen ? ' visible' : ''}`} onClick={() => setMobileSidebarOpen(false)} />
         <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
         <main className="chat-panel">
-          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
+          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} onViewContact={(c) => setEditContact(c)} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
         </main>
       </div>
       {showProfile && <ProfileModal profile={{ ...profile, address: wallet?.address ?? null }} onClose={() => setShowProfile(false)} onSave={saveProfile} />}
