@@ -83,6 +83,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
   const [showEmoji,setShowEmoji]=useState(false);
   const [recording,setRecording]=useState(false);
   const fileInputRef=useRef(null);
+  const attachBtnRef=useRef(null);
   const fileAcceptRef=useRef('*');
   const [recordSeconds,setRecordSeconds]=useState(0);
   const recordSecondsRef=useRef(0); // ref to avoid stale closure in onstop
@@ -149,9 +150,11 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
   };
 
   const openFilePicker=(accept)=>{
+    console.log('[PMT attach] openFilePicker called, accept:', accept, 'ref:', fileInputRef.current);
     fileAcceptRef.current=accept;
     fileInputRef.current.accept=accept;
     fileInputRef.current.click();
+    console.log('[PMT attach] .click() called');
   };
 
   const handleFileChosen=e=>{
@@ -396,7 +399,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
               <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
                 <div style={{position:'relative'}}>
                   <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileChosen}/>
-                  <button data-attach="true" onClick={()=>setShowAttach(v=>!v)}
+                  <button ref={attachBtnRef} data-attach="true" onClick={()=>setShowAttach(v=>!v)}
                     style={{width:44,height:44,background:showAttach?'var(--surface2)':'var(--surface)',
                       border:`1px solid ${showAttach?'var(--accent)':'var(--border)'}`,
                       borderRadius:9,color:showAttach?'var(--accent)':'var(--muted)',fontSize:18,
@@ -405,6 +408,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
                   {showAttach&&<AttachMenu
                     onImage={accept=>openFilePicker(accept)}
                     onFile={accept=>openFilePicker(accept)}
+                    anchorRect={attachBtnRef.current?.getBoundingClientRect()}
                     onClose={()=>setShowAttach(false)}/>}
                 </div>
                 <div style={{position:'relative'}}>
