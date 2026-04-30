@@ -148,14 +148,8 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
     return (bytes/(1024*1024)).toFixed(1)+'MB';
   };
 
-  const openFilePicker=(accept)=>{
-    fileAcceptRef.current=accept;
-    fileInputRef.current.accept=accept;
-    fileInputRef.current.click();
-  };
-
-  const handleFileChosen=e=>{
-    const file=e.target.files[0];
+  // handleFile receives a File object directly from AttachMenu (no programmatic .click())
+  const handleFile=(file)=>{
     if(!file)return;
     const localUrl=URL.createObjectURL(file);
     const isImage=file.type.startsWith('image/');
@@ -186,7 +180,6 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
         });
     };
     reader.readAsDataURL(file);
-    e.target.value='';
   };
   const key=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
 
@@ -394,7 +387,6 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
               </div>
             ):(
               <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
-                <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileChosen}/>
                 <div style={{position:'relative'}}>
                   <button onClick={()=>setShowAttach(v=>!v)}
                     style={{width:44,height:44,background:showAttach?'var(--surface2)':'var(--surface)',
@@ -403,8 +395,8 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
                       display:'flex',alignItems:'center',justifyContent:'center',
                       flexShrink:0,cursor:'pointer',transition:'all .15s'}}>📎</button>
                   {showAttach&&<AttachMenu
-                    onImage={accept=>openFilePicker(accept)}
-                    onFile={accept=>openFilePicker(accept)}
+                    onImage={handleFile}
+                    onFile={handleFile}
                     onClose={()=>setShowAttach(false)}/>}
                 </div>
                 <div style={{position:'relative'}}>

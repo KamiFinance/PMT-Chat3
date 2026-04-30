@@ -1,9 +1,18 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React from 'react';
 
+// Each item wraps a hidden <input type="file"> in a <label>.
+// The user's click on the label directly activates the input —
+// no programmatic .click() needed, so browsers never block it.
+export default function AttachMenu({onImage, onFile, onClose}) {
+  const items = [
+    { icon: '🖼', label: 'Image / Photo',  accept: 'image/*',                                              cb: onImage },
+    { icon: '📄', label: 'Document',       accept: '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar',        cb: onFile  },
+    { icon: '🎬', label: 'Video',          accept: 'video/*',                                              cb: onFile  },
+    { icon: '🎵', label: 'Audio File',     accept: 'audio/*',                                              cb: onFile  },
+  ];
 
-export default function AttachMenu({onImage,onFile,onClose}){
-  return(
+  return (
     <div style={{position:'absolute',bottom:'100%',left:0,marginBottom:6,
       background:'var(--panel)',border:'1px solid var(--border)',
       borderRadius:12,padding:8,display:'flex',flexDirection:'column',gap:4,
@@ -11,23 +20,34 @@ export default function AttachMenu({onImage,onFile,onClose}){
       animation:'fadeIn .15s ease'}}>
       <div style={{fontSize:10,color:'var(--muted)',fontFamily:'var(--mono)',
         letterSpacing:'1px',padding:'4px 8px 6px'}}>ATTACH</div>
-      {[
-        ['🖼', 'Image / Photo', 'image/*', onImage],
-        ['📄', 'Document', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar', onFile],
-        ['🎬', 'Video', 'video/*', onFile],
-        ['🎵', 'Audio File', 'audio/*', onFile],
-      ].map(([icon,label,accept,handler])=>(
-        <button key={label} onClick={()=>{handler(accept);onClose();}}
-          style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',
-            background:'transparent',border:'none',borderRadius:8,
-            color:'var(--text)',fontSize:14,cursor:'pointer',textAlign:'left',
-            transition:'background .12s',width:'100%'}}
-          onMouseEnter={e=>e.currentTarget.style.background='var(--surface)'}
-          onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-          <span style={{fontSize:18,width:24,textAlign:'center'}}>{icon}</span>
-          <span>{label}</span>
-        </button>
-      ))}
+      {items.map(({icon, label, accept, cb}) => {
+        const id = `attach-${label.replace(/\s/g,'-').toLowerCase()}`;
+        return (
+          <label key={label} htmlFor={id}
+            style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',
+              background:'transparent',borderRadius:8,
+              color:'var(--text)',fontSize:14,cursor:'pointer',
+              transition:'background .12s',width:'100%'}}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--surface)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            <span style={{fontSize:18,width:24,textAlign:'center'}}>{icon}</span>
+            <span>{label}</span>
+            <input
+              id={id}
+              type="file"
+              accept={accept}
+              style={{display:'none'}}
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                cb(file);         // pass the File directly
+                e.target.value = ''; // reset so same file can be re-picked
+                onClose();
+              }}
+            />
+          </label>
+        );
+      })}
     </div>
   );
 }
