@@ -18,7 +18,7 @@ export default function AttachMenu({onImage, onFile, onClose, anchorRect}) {
   ];
 
   return (
-    <div style={{position:'fixed',bottom,left,
+    <div data-attach="true" style={{position:'fixed',bottom,left,
       background:'var(--panel)',border:'1px solid var(--border)',
       borderRadius:12,padding:8,display:'flex',flexDirection:'column',gap:4,
       zIndex:99999,boxShadow:'0 8px 32px rgba(0,0,0,.4)',minWidth:180,
