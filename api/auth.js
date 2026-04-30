@@ -8,32 +8,23 @@ function cors(res) {
 }
 
 async function redis(cmd, ...args) {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Try all common Upstash/Vercel KV env var name patterns
+  const url = process.env.UPSTASH_KV_REST_API_URL
+    || process.env.KV_REST_API_URL
+    || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_KV_REST_API_TOKEN
+    || process.env.KV_REST_API_TOKEN
+    || process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (url && token) {
-    const res = await fetch(`${url}/${[cmd, ...args].map(encodeURIComponent).join('/')}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
-    return data.result;
-  }
+  if (!url || !token) throw new Error('No Redis REST credentials found');
 
-  const redisUrl = process.env.KV_REDIS_URL;
-  if (redisUrl) {
-    try {
-      const u = new URL(redisUrl);
-      const restUrl = `https://${u.hostname}`;
-      const restToken = u.password;
-      const res = await fetch(`${restUrl}/${[cmd, ...args].map(encodeURIComponent).join('/')}`, {
-        headers: { Authorization: `Bearer ${restToken}` }
-      });
-      const data = await res.json();
-      return data.result;
-    } catch {}
-  }
-
-  throw new Error('No Redis REST credentials configured');
+  const path = [cmd, ...args].map(a => encodeURIComponent(String(a))).join('/');
+  const res = await fetch(`${url}/${path}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`Redis HTTP ${res.status}`);
+  const data = await res.json();
+  return data.result;
 }
 
 export default async function handler(req, res) {
