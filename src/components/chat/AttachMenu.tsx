@@ -41,7 +41,7 @@ export default function AttachMenu({onImage, onFile, onClose, anchorRect}) {
               id={id}
               type="file"
               accept={accept}
-              style={{display:'none'}}
+              style={{opacity:0,position:'absolute',width:'1px',height:'1px',overflow:'hidden'}}
               onChange={e => {
                 const file = e.target.files?.[0];
                 if (!file) return;
