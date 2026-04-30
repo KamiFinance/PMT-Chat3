@@ -120,53 +120,46 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     setErr(null);
     setConnecting(true);
     try {
-      // Try the provided provider first, fall back to window.ethereum on extension conflicts
-      const tryProvider = async (p) => {
-        let accounts = [];
-        try { accounts = await p.request({method:'eth_accounts'}); } catch {}
-        if (!accounts?.length) accounts = await p.request({method:'eth_requestAccounts'});
-        return accounts;
+      const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
+
+      // Build list of providers to try, preferring real MetaMask over evmAsk proxy
+      const getRealProvider = () => {
+        // EIP-6963: check providers array for real MetaMask (not TronLink proxy)
+        const all = (window as any).ethereum?.providers || [];
+        const mm = all.find((p:any) => p.isMetaMask && !p.isTronLink && !p._evmAsk);
+        if (mm) return mm;
+        // If window.ethereum is MetaMask and not a proxy, use it directly
+        if ((window as any).ethereum?.isMetaMask) return (window as any).ethereum;
+        return provider;
       };
 
-      let accounts = [];
-      try {
-        accounts = await tryProvider(provider);
-      } catch(e1) {
-        // Extension conflict (evmAsk.js etc.) — retry with window.ethereum directly
-        if (window.ethereum && window.ethereum !== provider) {
-          try { accounts = await tryProvider(window.ethereum); } catch {}
-        }
-        if (!accounts?.length) throw e1;
-      }
+      const realProvider = getRealProvider();
 
-      if (!accounts?.length) throw new Error('No accounts returned');
-      // Use window.ethereum for subsequent calls (more reliable)
-      const p = window.ethereum || provider;
-      const chainId  = await p.request({method:'eth_chainId'}).catch(()=>'0x1');
-      const balHex   = await p.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
-      const balEth   = (parseInt(balHex, 16) / 1e18).toFixed(4);
-      const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
-      onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName, _provider: p});
-    } catch(e) {
+      const doConnect = async (p:any) => {
+        let accounts:string[] = [];
+        try { accounts = await p.request({method:'eth_accounts'}); } catch {}
+        if (!accounts?.length) accounts = await p.request({method:'eth_requestAccounts'});
+        if (!accounts?.length) throw new Error('No accounts returned');
+        const chainId = await p.request({method:'eth_chainId'}).catch(()=>'0x1');
+        const balHex  = await p.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
+        const balEth  = (parseInt(balHex,16)/1e18).toFixed(4);
+        onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName, _provider:p});
+      };
+
+      // Try real provider first, fall back to passed provider
+      try {
+        await doConnect(realProvider);
+      } catch(e1:any) {
+        if (e1.code === 4001) throw e1; // user rejected — don't retry
+        if (realProvider !== provider) {
+          await doConnect(provider); // retry with the passed provider
+        } else {
+          throw e1;
+        }
+      }
+    } catch(e:any) {
       if (e.code === 4001) setErr('Connection rejected. Please approve in your wallet.');
       else if (e.code === -32002) setErr('Open MetaMask and approve the pending connection request.');
-      else if (e.message?.includes('evmAsk') || e.message?.includes('Unexpected error')) {
-        // Extension conflict — try direct window.ethereum
-        if (window.ethereum) {
-          try {
-            const accounts = await window.ethereum.request({method:'eth_requestAccounts'});
-            if (accounts?.length) {
-              const chainId = await window.ethereum.request({method:'eth_chainId'}).catch(()=>'0x1');
-              const balHex  = await window.ethereum.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
-              const balEth  = (parseInt(balHex,16)/1e18).toFixed(4);
-              const netNames2 = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
-              onMetaMask({address:accounts[0],balance:balEth,network:netNames2[chainId]||('Chain '+parseInt(chainId,16)),chainId,isMetaMask:true,walletName,_provider:window.ethereum});
-              return;
-            }
-          } catch {}
-        }
-        setErr('Wallet extension conflict detected. Try disabling other wallet extensions and reload.');
-      }
       else setErr('Connection failed: ' + (e.message||String(e)));
     } finally { setConnecting(false); }
   };
