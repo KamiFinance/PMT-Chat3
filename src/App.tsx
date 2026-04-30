@@ -117,6 +117,7 @@ export default function App() {
   const [active, setActive] = useState<Contact | null>(null);
   const activeRef = useRef<Contact | null>(null);
   const walletRef = useRef<Wallet | null>(null);
+  const realProviderRef = useRef<any>(null);
   const profileRef = useRef<Profile>({ name: '', bio: '', avatarUrl: null, address: null });
 
   const setActiveAndRef = useCallback((c: Contact | null) => {
@@ -427,12 +428,7 @@ export default function App() {
 
   const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
     setIsDemo(false); // clear demo mode when real wallet logs in
-    // For password wallets: store window.ethereum as provider if available
-    if (typeof window !== 'undefined' && window.ethereum) {
-      const mmProvider = (window.ethereum as any).providers?.find?.((p:any) => p.isMetaMask && !p.isTronLink) 
-                       || ((window.ethereum as any).isMetaMask ? window.ethereum : window.ethereum);
-      realProviderRef.current = mmProvider;
-    }
+    realProviderRef.current = (w as any)._provider || window.ethereum || null;
     setWallet(w);
     walletRef.current = w;
     // If cloud restore: seed contacts and messages
