@@ -76,7 +76,7 @@ function EmojiPicker({onSelect,onClose}:{onSelect:(e:string)=>void,onClose:()=>v
   );
 }
 
-export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar,onBack,onViewContact}){
+export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAddress,onReact,searchQuery,isGroup,onMediaUploaded,onOpenSidebar,onBack,onViewContact}){
   const [text,setText]=useState('');
   const [showSend,setShowSend]=useState(false);
   const [showAttach,setShowAttach]=useState(false);
@@ -315,7 +315,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,onRe
             </div>
             {messages.map(m=>(
               <Bubble key={m.id} msg={m} isOut={m.out} contact={contact}
-                onReact={onReact} searchQuery={searchQuery}/>
+                myAddress={myAddress} onReact={onReact} searchQuery={searchQuery}/>
             ))}
             <div ref={bottomRef}/>
           </div>

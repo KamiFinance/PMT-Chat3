@@ -285,9 +285,19 @@ export default function App() {
         ...p,
         [addr]: (p[addr] ?? []).map(m => {
           if (m.id !== msgId) return m;
-          const reactions = { ...(m.reactions ?? {}) };
-          reactions[emoji] = (reactions[emoji] ?? 0) === 1 ? 0 : 1;
-          if (!isDemo && walletRef.current?.address) {
+          const myAddr = walletRef.current?.address?.toLowerCase() ?? '';
+          // Address-keyed reactions: {emoji: {address: 1}} — each user owns their own reaction
+          const reactions = { ...(m.reactions ?? {}) } as Record<string, any>;
+          const emojiEntry = reactions[emoji];
+          const prev = typeof emojiEntry === 'object' ? { ...emojiEntry } : {};
+          // Toggle: add if not present, remove if already reacted
+          if (prev[myAddr]) {
+            delete prev[myAddr];
+          } else {
+            prev[myAddr] = 1;
+          }
+          reactions[emoji] = prev;
+          if (!isDemo && myAddr) {
             // Include msgHash as fallback identifier — handles cases where msgId differs across devices
             // (can happen when messages arrived via different paths during relay outages)
             const rxnMsg = { id: `rxn_${Date.now()}`, type: 'reaction', msgId, msgHash: m.hash, emoji, reactions, from: walletRef.current.address, ts: Date.now() };
@@ -505,7 +515,7 @@ export default function App() {
         <div className={`sidebar-overlay${mobileSidebarOpen ? ' visible' : ''}`} onClick={() => setMobileSidebarOpen(false)} />
         <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
         <main className="chat-panel">
-          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} onViewContact={(c) => setEditContact(c)} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
+          {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} myAddress={wallet?.address?.toLowerCase() ?? ''} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} onViewContact={(c) => setEditContact(c)} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
         </main>
       </div>
       {showProfile && <ProfileModal profile={{ ...profile, address: wallet?.address ?? null }} onClose={() => setShowProfile(false)} onSave={saveProfile} />}

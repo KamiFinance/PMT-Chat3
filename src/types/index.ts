@@ -3,7 +3,9 @@
 export type MessageType = 'text' | 'voice' | 'image' | 'file' | 'tx' | 'reaction';
 
 export interface Reaction {
-  [emoji: string]: number;
+  // Format: {[emoji]: {[reactorAddress]: 1}} for ownership tracking
+  // Backward-compat: also accepts {[emoji]: number} for old reactions
+  [emoji: string]: {[address: string]: number} | number;
 }
 
 export interface Message {

@@ -118,8 +118,20 @@ export function useInboxPoll({
                 const idMatch = m.id === inboxMsg.msgId;
                 const hashMatch = inboxMsg.msgHash && m.hash && m.hash === inboxMsg.msgHash;
                 if (!idMatch && !hashMatch) return m;
-                // Merge incoming reactions: keep our own reactions, apply sender's
-                const merged = { ...(m.reactions ?? {}), ...(inboxMsg.reactions ?? {}) };
+                // Merge address-keyed reactions: deep merge per-emoji per-address
+                // {emoji: {addr: 1}} — each address's reaction is independent
+                const existing: Record<string,any> = { ...(m.reactions ?? {}) };
+                const incoming: Record<string,any> = inboxMsg.reactions ?? {};
+                const merged: Record<string,any> = { ...existing };
+                Object.entries(incoming).forEach(([emoji, val]) => {
+                  if (typeof val === 'object' && val !== null) {
+                    // New format: merge per-address
+                    merged[emoji] = { ...(typeof existing[emoji]==='object'?existing[emoji]:{}), ...val };
+                  } else {
+                    // Old format: keep higher value
+                    merged[emoji] = Math.max(Number(existing[emoji]??0), Number(val??0));
+                  }
+                });
                 return { ...m, reactions: merged };
               });
             });

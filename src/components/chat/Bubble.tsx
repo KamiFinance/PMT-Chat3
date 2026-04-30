@@ -72,11 +72,14 @@ function SenderProfileCard({msg, contact, onClose}) {
   );
 }
 
-export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
+export default function Bubble({msg,isOut,contact,myAddress,onReact,searchQuery}){
   const [showPicker,setShowPicker]=useState(false);
   const [showSenderProfile,setShowSenderProfile]=useState(false);
   const reactions=msg.reactions||{};
-  const reactionEntries=Object.entries(reactions).filter(([,v])=>v>0);
+  // Support both formats: {emoji: {addr: 1}} (new) and {emoji: count} (old)
+  const getRxnCount=(v)=>typeof v==='object'&&v!==null?Object.values(v).filter((x)=>Number(x)>0).length:Number(v)>0?Number(v):0;
+  const iMine=(v)=>typeof v==='object'&&v!==null?Number((v as any)[myAddress??''])>0:Number(v)>0;
+  const reactionEntries=Object.entries(reactions).filter(([,v])=>getRxnCount(v)>0);
   const longPressRef=useRef(null);
 
   const handleLongPress=()=>{longPressRef.current=setTimeout(()=>setShowPicker(true),500);};
@@ -117,14 +120,24 @@ export default function Bubble({msg,isOut,contact,onReact,searchQuery}){
 
   const reactionsBar=reactionEntries.length>0&&(
     <div style={{display:'flex',gap:3,marginTop:4,flexWrap:'wrap',justifyContent:isOut?'flex-end':'flex-start'}}>
-      {reactionEntries.map(([emoji,count])=>(
-        <button key={emoji} onClick={()=>onReact&&onReact(msg.id,emoji)}
-          style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
-            padding:'1px 6px',fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:3,
-            animation:'popIn .2s ease'}}>
-          {emoji}<span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text2)'}}>{count}</span>
-        </button>
-      ))}
+      {reactionEntries.map(([emoji,v])=>{
+        const count=getRxnCount(v);
+        const mine=iMine(v);
+        return(
+          <button key={emoji}
+            onClick={()=>mine&&onReact&&onReact(msg.id,emoji)}
+            title={mine?'Click to remove your reaction':''}
+            style={{background:mine?'rgba(250,255,99,.12)':'var(--surface)',
+              border:`1px solid ${mine?'rgba(250,255,99,.4)':'var(--border)'}`,
+              borderRadius:12,padding:'1px 6px',fontSize:12,
+              cursor:mine?'pointer':'default',
+              display:'flex',alignItems:'center',gap:3,
+              animation:'popIn .2s ease',
+              opacity:mine?1:0.85}}>
+            {emoji}<span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text2)'}}>{count}</span>
+          </button>
+        );
+      })}
     </div>
   );
 
