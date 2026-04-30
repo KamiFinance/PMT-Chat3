@@ -112,6 +112,11 @@ export default function App() {
     return null;
   });
   const [isDemo, setIsDemo] = useState(false);
+  // One-time prompt to collect password for cloud backup when session was restored from localStorage
+  const [backupPromptPassword, setBackupPromptPassword] = useState('');
+  const [showBackupPrompt, setShowBackupPrompt] = useState(false);
+  const [backupPromptErr, setBackupPromptErr] = useState('');
+  const [backupPromptSaving, setBackupPromptSaving] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [msgs, setMsgs] = useState<MsgsMap>({});
   const [active, setActive] = useState<Contact | null>(null);
@@ -479,6 +484,21 @@ export default function App() {
     setScreen('chat');
   }, [setContacts, setMsgs]);
 
+  // On mount: if session was restored from localStorage but no password in memory,
+  // check if cloud backup exists — if not, show one-time password prompt to create it
+  useEffect(() => {
+    if (!wallet?.address || isDemo || !wallet.username) return;
+    if (sessionPasswordRef.current) return; // already have password from fresh login
+    const uname = wallet.username.toLowerCase();
+    fetch(`/api/auth?username=${encodeURIComponent(uname)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.encryptedBackup) setShowBackupPrompt(true);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet?.address]);
+
   // Trigger an immediate backup 3s after login (so contacts/msgs are loaded into state first)
   // This ensures the backup fires even if the user doesn't change any data
   useEffect(() => {
@@ -568,6 +588,89 @@ export default function App() {
         </main>
       </div>
       {showProfile && <ProfileModal profile={{ ...profile, address: wallet?.address ?? null }} onClose={() => setShowProfile(false)} onSave={saveProfile} />}
+
+      {/* One-time backup password prompt — appears when session was restored but no cloud backup exists */}
+      {showBackupPrompt && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16}}>
+          <div style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:16,padding:'24px 20px',width:'100%',maxWidth:380,display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{fontSize:16,fontWeight:600}}>Enable cloud backup</div>
+            <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.5}}>Enter your password once to save an encrypted backup. This lets you restore your account on any device.</div>
+            <input type="password" placeholder="Your password" value={backupPromptPassword}
+              onChange={e=>{setBackupPromptPassword(e.target.value);setBackupPromptErr('');}}
+              onKeyDown={async e=>{
+                if(e.key==='Enter'&&backupPromptPassword){
+                  setBackupPromptSaving(true);setBackupPromptErr('');
+                  try{
+                    const uname=wallet?.username?.toLowerCase()??'';
+                    const {PMTAuth}=await import('./lib/auth');
+                    const acctKey=`pmt_account_${uname}`;
+                    const acctByAddr=localStorage.getItem(`pmt_account_${wallet?.address?.toLowerCase()}`);
+                    const acct=localStorage.getItem(acctKey)||acctByAddr;
+                    if(acct){
+                      const parsed=JSON.parse(acct);
+                      const ok=await PMTAuth.verifyPassword(backupPromptPassword,parsed.passwordHash,parsed.passwordSalt);
+                      if(!ok){setBackupPromptErr('Incorrect password');setBackupPromptSaving(false);return;}
+                    }
+                    sessionPasswordRef.current=backupPromptPassword;
+                    const cleanMsgs:Record<string,object[]>={};
+                    Object.entries(msgs).forEach(([addr,arr])=>{
+                      cleanMsgs[addr]=(arr as any[]).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,...keep}=m;return keep;});
+                    });
+                    const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
+                    await scb(uname,backupPromptPassword,{
+                      wallet:{address:wallet?.address??'',privateKey:wallet?.privateKey??'',username:uname},
+                      contacts,messages:cleanMsgs,profile:profileRef.current??{}
+                    });
+                    setShowBackupPrompt(false);setBackupPromptPassword('');
+                  }catch(err:any){setBackupPromptErr(err.message||'Failed — check password');}
+                  finally{setBackupPromptSaving(false);}
+                }
+              }}
+              autoFocus
+              style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 13px',color:'var(--text)',fontSize:14,outline:'none',width:'100%'}}/>
+            {backupPromptErr&&<div style={{fontSize:12,color:'var(--danger)'}}>{backupPromptErr}</div>}
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>{setShowBackupPrompt(false);setBackupPromptPassword('');}}
+                style={{flex:1,padding:'10px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,color:'var(--text)',cursor:'pointer',fontSize:13}}>
+                Later
+              </button>
+              <button disabled={!backupPromptPassword||backupPromptSaving}
+                onClick={async()=>{
+                  setBackupPromptSaving(true);setBackupPromptErr('');
+                  try{
+                    const uname=wallet?.username?.toLowerCase()??'';
+                    const{PMTAuth}=await import('./lib/auth');
+                    const acctKey=`pmt_account_${uname}`;
+                    const acctByAddrRaw=localStorage.getItem(`pmt_account_${wallet?.address?.toLowerCase()}`);
+                    const acctRaw=localStorage.getItem(acctKey)||acctByAddrRaw;
+                    if(acctRaw){
+                      const parsed=JSON.parse(acctRaw);
+                      const ok=await PMTAuth.verifyPassword(backupPromptPassword,parsed.passwordHash,parsed.passwordSalt);
+                      if(!ok){setBackupPromptErr('Incorrect password');setBackupPromptSaving(false);return;}
+                    }
+                    sessionPasswordRef.current=backupPromptPassword;
+                    const cleanMsgs:Record<string,object[]>={};
+                    Object.entries(msgs).forEach(([addr,arr])=>{
+                      cleanMsgs[addr]=(arr as any[]).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,...keep}=m;return keep;});
+                    });
+                    const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
+                    await scb(uname,backupPromptPassword,{
+                      wallet:{address:wallet?.address??'',privateKey:wallet?.privateKey??'',username:uname},
+                      contacts,messages:cleanMsgs,profile:profileRef.current??{}
+                    });
+                    setShowBackupPrompt(false);setBackupPromptPassword('');
+                  }catch(err:any){setBackupPromptErr(err.message||'Failed — check password');}
+                  finally{setBackupPromptSaving(false);}
+                }}
+                style={{flex:2,padding:'10px',background:'var(--accent)',border:'none',borderRadius:9,
+                  color:'#0a0c14',fontWeight:600,fontSize:13,cursor:'pointer',
+                  opacity:!backupPromptPassword||backupPromptSaving?0.6:1}}>
+                {backupPromptSaving?'Saving…':'Save Backup'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} darkMode={darkMode} onToggleTheme={toggleTheme} />}
       {showWallet && <WalletModal wallet={wallet} isDemo={isDemo} onClose={() => setShowWallet(false)} />}
       {showNew && <NewChatModal onClose={() => setShowNew(false)} onAdd={(c) => { setContacts(p => p.find(x => normalizeAddress(x.address) === normalizeAddress(c.address)) ? p : [...p, c]); selectContact(c); setShowNew(false); }} />}
