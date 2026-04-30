@@ -8,7 +8,9 @@ import { PMTAuth } from './auth';
 
 async function encryptBackup(data: object, password: string, saltHex: string): Promise<string> {
   const enc = new TextEncoder();
-  const toBytes = (h: string) => new Uint8Array((h.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)));
+  // Defensive: coerce to string in case a non-string sneaks in (e.g. from old account format)
+  const toBytes = (h: any) => { const s = typeof h === 'string' ? h : String(h ?? ''); return new Uint8Array((s.match(/.{2}/g) ?? []).map((x: string) => parseInt(x, 16))); };
+  if (typeof saltHex !== 'string') throw new Error('encryptBackup: saltHex must be string, got ' + typeof saltHex);
   const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt: toBytes(saltHex), iterations: 150000, hash: 'SHA-256' },
@@ -23,7 +25,10 @@ async function encryptBackup(data: object, password: string, saltHex: string): P
 async function decryptBackup(blob: string, password: string, saltHex: string): Promise<object> {
   const { encrypted, iv } = JSON.parse(blob);
   const enc = new TextEncoder();
-  const toBytes = (h: string) => new Uint8Array((h.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)));
+  const toBytes = (h: any) => { const s = typeof h === 'string' ? h : String(h ?? ''); return new Uint8Array((s.match(/.{2}/g) ?? []).map((x: string) => parseInt(x, 16))); };
+  if (typeof saltHex !== 'string') throw new Error('decryptBackup: saltHex must be string, got ' + typeof saltHex);
+  if (typeof encrypted !== 'string') throw new Error('decryptBackup: encrypted must be string, got ' + typeof encrypted);
+  if (typeof iv !== 'string') throw new Error('decryptBackup: iv must be string, got ' + typeof iv);
   const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt: toBytes(saltHex), iterations: 150000, hash: 'SHA-256' },
