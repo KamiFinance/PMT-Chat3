@@ -146,7 +146,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       const balHex   = await p.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
       const balEth   = (parseInt(balHex, 16) / 1e18).toFixed(4);
       const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
-      onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName});
+      onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName, _provider: p});
     } catch(e) {
       if (e.code === 4001) setErr('Connection rejected. Please approve in your wallet.');
       else if (e.code === -32002) setErr('Open MetaMask and approve the pending connection request.');
@@ -159,8 +159,8 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
               const chainId = await window.ethereum.request({method:'eth_chainId'}).catch(()=>'0x1');
               const balHex  = await window.ethereum.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
               const balEth  = (parseInt(balHex,16)/1e18).toFixed(4);
-              const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
-              onMetaMask({address:accounts[0],balance:balEth,network:netNames[chainId]||('Chain '+parseInt(chainId,16)),chainId,isMetaMask:true,walletName});
+              const netNames2 = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
+              onMetaMask({address:accounts[0],balance:balEth,network:netNames2[chainId]||('Chain '+parseInt(chainId,16)),chainId,isMetaMask:true,walletName,_provider:window.ethereum});
               return;
             }
           } catch {}
