@@ -66,7 +66,9 @@ export async function saveCloudBackup(
     ? localStorage.getItem(`pmt_account_${data.wallet.address.toLowerCase()}`)
     : null;
   const accountData = byUsername ? JSON.parse(byUsername) : byAddress ? JSON.parse(byAddress) : null;
-  const existingSalt = accountData?.passwordSalt ?? accountData?.salt ?? null;
+  // Enforce string — old accounts may have stored salt as a Uint8Array-like object
+  const rawSalt = accountData?.passwordSalt ?? accountData?.salt ?? null;
+  const existingSalt = typeof rawSalt === 'string' ? rawSalt : null;
 
   const { hash: passwordHash, salt } = await PMTAuth.hashPassword(password, existingSalt ?? undefined);
 
