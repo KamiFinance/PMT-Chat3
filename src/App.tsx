@@ -312,8 +312,6 @@ export default function App() {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
-        // Prefer the real MetaMask provider stored at connect time over window.ethereum
-        // (window.ethereum may be hijacked by TronLink/evmAsk)
         const provider = realProviderRef.current || window.ethereum;
         const txHash = await (provider as any).request({
           method: 'eth_sendTransaction',
@@ -374,45 +372,25 @@ export default function App() {
     }
 
     // Blockchain delivery
-    // Debug: log why relay might be skipped
-    console.log('[PMT send check] isGroup=' + activeRef.current?.isGroup + ' isAI=' + activeRef.current?.isAI + ' isDemo=' + isDemo + ' wallet=' + (walletRef.current?.address ? walletRef.current.address.slice(0,10) : 'NONE'));
-    console.log('[PMT guard]', !activeRef.current.isGroup, !activeRef.current.isAI, !isDemo, !!walletRef.current?.address, 'addr=', activeRef.current?.address?.slice(0,10));
     if (!activeRef.current.isGroup && !activeRef.current.isAI && !isDemo && walletRef.current?.address) {
       const w = walletRef.current;
       const toAddr = normalizeAddress(activeRef.current.address);
-      console.log('[PMT guard ENTERED] toAddr=', toAddr.slice(0,10));
       const msgContent = isVoice ? '🎙 Voice message' : isImage ? '🖼 Image' : isFile ? `📄 ${(input as Message).fileName ?? 'File'}` : input as string;
       const msgType = isVoice ? 'voice' : isImage ? 'image' : isFile ? 'file' : 'text';
       try {
-        console.log('[PMT relay] building inboxMsg, toAddr=', toAddr.slice(0,10));
         const inboxMsg = { id: msg.id, type: msg.type, text: msgContent, ...(isVoice && { duration: (input as Message).duration, waveform: (input as Message).waveform, audioMsgId: (input as Message).audioMsgId, ipfsCid: (input as Message).ipfsCid, ipfsUrl: (input as Message).ipfsUrl }), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
         const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
         localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
-        // Also deliver via cross-device API relay
-        console.log('[PMT relay] POSTing to', toAddr.slice(0,10));
+        // Also deliver via cross-device API relay (fire-and-forget)
         fetch(`/api/inbox?address=${toAddr}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(inboxMsg),
-        }).then(r => {
-          console.log('[PMT relay] POST status:', r.status);
-          if (!r.ok) console.warn('[PMT relay] POST failed:', r.status);
-        }).catch(e => {
-          console.warn('[PMT relay] POST error:', e?.message);
-          setTimeout(() => {
-            fetch(`/api/inbox?address=${toAddr}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(inboxMsg),
-            }).catch(() => {});
-          }, 2000);
-        });
-      } catch(relayErr: any) {
-        console.error('[PMT relay] ERROR building/sending:', relayErr?.message || String(relayErr));
-      }
+        }).catch(() => { /* offline or API not configured — localStorage delivery only */ });
+      } catch {}
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
-        const { txHash, chain } = await broadcastMessage({ from: w.address, to: toAddr, msgHash, msgType, blockNum: block, useMetaMask: !!(w.isMetaMask), metaMaskProvider: realProviderRef.current || window.ethereum || null });
+        const { txHash, chain } = await broadcastMessage({ from: w.address, to: toAddr, msgHash, msgType, blockNum: block, useMetaMask: !!(window.ethereum && w.isMetaMask), metaMaskProvider: realProviderRef.current || window.ethereum || null });
         setMsgs(p => ({ ...p, [toAddr]: (p[toAddr] ?? []).map(m => m.id === msg.id ? { ...m, hash: shortHash(txHash), chain, onChain: true } : m) }));
       } catch {}
     }
@@ -433,7 +411,7 @@ export default function App() {
   }, [accountKey]);
 
   const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
-    setIsDemo(false); // clear demo mode when real wallet logs in
+    setIsDemo(false);
     realProviderRef.current = (w as any)._provider || window.ethereum || null;
     setWallet(w);
     walletRef.current = w;
@@ -466,11 +444,8 @@ export default function App() {
                 }
               } catch {}
 
-              setIsDemo(false); // always clear demo when real wallet connects
-              // Store the real provider — use _provider from wallet if passed (avoids TronLink/evmAsk hijack)
-              realProviderRef.current = (w as any)._provider 
-                || window.ethereum?.providers?.find?.((p:any) => p.isMetaMask && !p.isTronLink) 
-                || window.ethereum || null;
+              setIsDemo(false);
+              realProviderRef.current = (w as any)._provider || window.ethereum || null;
               if (savedAcct || sessMatch) {
                 // Returning user — go straight to chat
                 try {
