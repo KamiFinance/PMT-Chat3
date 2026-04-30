@@ -122,19 +122,6 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     try {
       const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
 
-      // Build list of providers to try, preferring real MetaMask over evmAsk proxy
-      const getRealProvider = () => {
-        // EIP-6963: check providers array for real MetaMask (not TronLink proxy)
-        const all = (window as any).ethereum?.providers || [];
-        const mm = all.find((p:any) => p.isMetaMask && !p.isTronLink && !p._evmAsk);
-        if (mm) return mm;
-        // If window.ethereum is MetaMask and not a proxy, use it directly
-        if ((window as any).ethereum?.isMetaMask) return (window as any).ethereum;
-        return provider;
-      };
-
-      const realProvider = getRealProvider();
-
       const doConnect = async (p:any) => {
         let accounts:string[] = [];
         try { accounts = await p.request({method:'eth_accounts'}); } catch {}
@@ -146,20 +133,13 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName, _provider:p});
       };
 
-      // Try real provider first, fall back to passed provider
-      try {
-        await doConnect(realProvider);
-      } catch(e1:any) {
-        if (e1.code === 4001) throw e1; // user rejected — don't retry
-        if (realProvider !== provider) {
-          await doConnect(provider); // retry with the passed provider
-        } else {
-          throw e1;
-        }
-      }
+      await doConnect(provider);
     } catch(e:any) {
       if (e.code === 4001) setErr('Connection rejected. Please approve in your wallet.');
       else if (e.code === -32002) setErr('Open MetaMask and approve the pending connection request.');
+      else if (e.message?.includes('Unexpected error') || e.message?.includes('evmAsk')) {
+        setErr('⚠️ TronLink is blocking MetaMask. Please disable TronLink extension and reload.');
+      }
       else setErr('Connection failed: ' + (e.message||String(e)));
     } finally { setConnecting(false); }
   };
