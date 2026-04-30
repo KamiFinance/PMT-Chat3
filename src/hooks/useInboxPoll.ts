@@ -26,7 +26,18 @@ function reconstructVoiceMsg(inboxMsg: InboxMessage): Partial<Message> {
     audioUrl = getIpfsUrl(inboxMsg.ipfsCid);
   } else if (inboxMsg.ipfsUrl) {
     audioUrl = inboxMsg.ipfsUrl;
+  } else if ((inboxMsg as any).audioB64) {
+    // audioB64 sent directly in relay (fallback when no IPFS) — cross-device playback
+    try {
+      const b64 = (inboxMsg as any).audioB64 as string;
+      const mime = b64.split(';')[0].split(':')[1] || 'audio/mp4';
+      const dec = atob(b64.split(',')[1]);
+      const bytes = new Uint8Array(dec.length);
+      for (let i = 0; i < dec.length; i++) bytes[i] = dec.charCodeAt(i);
+      audioUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch { /* ignore */ }
   } else if (inboxMsg.audioMsgId) {
+    // Same-device fallback (audioMsgId in localStorage — only works on sender device)
     try {
       const b64 = storage.getAudio(inboxMsg.audioMsgId);
       if (b64) {

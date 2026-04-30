@@ -194,7 +194,9 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
     setRecorderError(null);
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      const mr=new MediaRecorder(stream);
+      // Pick MIME type supported by this browser — iOS Safari needs audio/mp4, Chrome uses audio/webm
+      const mimeType = ['audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm','audio/ogg'].find(t=>MediaRecorder.isTypeSupported(t)) || '';
+      const mr=mimeType ? new MediaRecorder(stream,{mimeType}) : new MediaRecorder(stream);
       chunksRef.current=[];
       waveformRef.current=[];
       // Analyse audio for waveform
@@ -213,7 +215,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
       mr.onstop=()=>{
         stream.getTracks().forEach(t=>t.stop());
         ctx.close();
-        const blob=new Blob(chunksRef.current,{type:'audio/webm'});
+        const blob=new Blob(chunksRef.current,{type:mr.mimeType||'audio/webm'});
         const url=URL.createObjectURL(blob);
         const dur=recordSecondsRef.current;
         const raw=waveformRef.current;
@@ -231,7 +233,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
 
           if(true){
             // Upload to IPFS for cross-device delivery
-            uploadToPinata(blob, 'voice_'+msgId+'.webm')
+            uploadToPinata(blob, 'voice_'+msgId+'.'+(mr.mimeType?.includes('mp4')||mr.mimeType?.includes('aac')?'m4a':'webm'))
               .then(cid=>{
                 const ipfsUrl=getIpfsUrl(cid);
                 onSendRef.current({type:'voice',audioUrl:url,audioMsgId:msgId,ipfsCid:cid,ipfsUrl,duration:dur,waveform:bars});

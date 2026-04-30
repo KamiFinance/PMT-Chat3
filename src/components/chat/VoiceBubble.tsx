@@ -19,6 +19,18 @@ export default function VoiceBubble({msg,isOut,contact}){
       return;
     }
     if(msg.ipfsUrl){ setAudioUrl(msg.ipfsUrl); return; }
+    // audioB64 is included directly in relay message when no IPFS — cross-device playback
+    if((msg as any).audioB64){
+      try{
+        const b64=(msg as any).audioB64 as string;
+        const mime=b64.split(';')[0].split(':')[1]||'audio/mp4';
+        const dec=atob(b64.split(',')[1]);
+        const bytes=new Uint8Array(dec.length);
+        for(let i=0;i<dec.length;i++) bytes[i]=dec.charCodeAt(i);
+        setAudioUrl(URL.createObjectURL(new Blob([bytes],{type:mime})));
+      }catch(e){}
+      return;
+    }
     if(!msg.audioMsgId)return;
     try{
       const b64=localStorage.getItem('pmt_audio_'+msg.audioMsgId);
@@ -29,7 +41,7 @@ export default function VoiceBubble({msg,isOut,contact}){
       for(let i=0;i<dec.length;i++) bytes[i]=dec.charCodeAt(i);
       setAudioUrl(URL.createObjectURL(new Blob([bytes],{type:mime})));
     }catch(e){}
-  },[msg.audioMsgId,msg.ipfsCid,msg.ipfsUrl]);
+  },[msg.audioMsgId,msg.ipfsCid,msg.ipfsUrl,(msg as any).audioB64]);
 
   const hasAudio=!!audioUrl;
   const toggle=()=>{
