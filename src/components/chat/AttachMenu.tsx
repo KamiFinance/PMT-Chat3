@@ -21,12 +21,12 @@ export default function AttachMenu({onImage, onFile, onClose, anchorRect}) {
     <div style={{position:'fixed',bottom,left,
       background:'var(--panel)',border:'1px solid var(--border)',
       borderRadius:12,padding:8,display:'flex',flexDirection:'column',gap:4,
-      zIndex:9999,boxShadow:'0 8px 32px rgba(0,0,0,.4)',minWidth:180,
+      zIndex:99999,boxShadow:'0 8px 32px rgba(0,0,0,.4)',minWidth:180,
       animation:'fadeIn .15s ease'}}>
       <div style={{fontSize:10,color:'var(--muted)',fontFamily:'var(--mono)',
         letterSpacing:'1px',padding:'4px 8px 6px'}}>ATTACH</div>
       {items.map(({icon, label, accept, cb}) => {
-        const id = `attach-${label.replace(/\s/g,'-').toLowerCase()}`;
+        const id = `attach-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
         return (
           <label key={label} htmlFor={id}
             style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',
