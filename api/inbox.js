@@ -1,23 +1,69 @@
-// Cross-device message relay using ioredis + KV_REDIS_URL
-// Key: pmt:inbox:{address} — stores messages for that address
-// Key: pmt:online:{address} — stores last-seen timestamp + username
+// Cross-device message relay
+// Delivery strategy (in order):
+//   1. Direct address match (pmt:inbox:{address})
+//   2. Username lookup → current address (pmt:user:{username} → address)
+//   3. Legacy address lookup → forwarding address (pmt:fwd:{oldAddr} → newAddr)
 
 import Redis from 'ioredis';
 
-let _redis = null;
-
+let _r = null;
 function getRedis() {
   const url = process.env.KV_REDIS_URL;
   if (!url) return null;
-  if (_redis && (_redis.status === 'ready' || _redis.status === 'connect')) return _redis;
-  if (_redis) { try { _redis.disconnect(); } catch {} }
-  _redis = new Redis(url, {
+  if (_r && (_r.status === 'ready' || _r.status === 'connect')) return _r;
+  if (_r) { try { _r.disconnect(); } catch {} }
+  _r = new Redis(url, {
     maxRetriesPerRequest: 1, connectTimeout: 5000, commandTimeout: 5000,
-    enableOfflineQueue: true, lazyConnect: false,
+    enableOfflineQueue: true,
     tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
   });
-  _redis.on('error', () => { _redis = null; });
-  return _redis;
+  _r.on('error', () => { _r = null; });
+  return _r;
+}
+
+async function waitReady(r) {
+  if (r.status === 'ready') return;
+  await new Promise((ok, fail) => {
+    const t = setTimeout(() => fail(new Error('timeout')), 4000);
+    r.once('ready', () => { clearTimeout(t); ok(); });
+    r.once('error', e => { clearTimeout(t); fail(e); });
+  });
+}
+
+// Deliver msg to a Redis list key, return true if delivered
+async function deliver(r, address, msg) {
+  if (!address) return false;
+  const key = `pmt:inbox:${address.toLowerCase()}`;
+  await r.rpush(key, JSON.stringify(msg));
+  await r.expire(key, 604800);
+  return true;
+}
+
+// Resolve the best delivery address for a given address+username combo
+async function resolveDeliveryAddresses(r, contactAddr, contactUsername) {
+  const addrs = new Set();
+  if (contactAddr) addrs.add(contactAddr.toLowerCase());
+
+  // Try username → current address
+  if (contactUsername) {
+    try {
+      const raw = await r.get(`pmt:user:${contactUsername.toLowerCase()}`);
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u.address) addrs.add(u.address.toLowerCase());
+      }
+    } catch {}
+  }
+
+  // Try forwarding table: stored contact addr → current polling addr
+  if (contactAddr) {
+    try {
+      const fwd = await r.get(`pmt:fwd:${contactAddr.toLowerCase()}`);
+      if (fwd) addrs.add(fwd.toLowerCase());
+    } catch {}
+  }
+
+  return [...addrs];
 }
 
 function cors(res) {
@@ -34,9 +80,9 @@ export default async function handler(req, res) {
 
   const urlObj = new URL(req.url, `http://${req.headers.host}`);
   const address = (urlObj.searchParams.get('address') || '').toLowerCase().slice(0, 66);
-  const username = (urlObj.searchParams.get('username') || '').toLowerCase().trim();
+  const username = (urlObj.searchParams.get('username') || '').toLowerCase().trim().slice(0, 50);
 
-  if (!address && !username) { res.status(400).json({ error: 'address or username required' }); return; }
+  if (!address) { res.status(400).json({ error: 'address required' }); return; }
 
   const r = getRedis();
   if (!r) {
@@ -44,43 +90,33 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, relay: 'disabled' });
   }
 
-  // Wait for Redis ready
-  if (r.status !== 'ready') {
-    await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('timeout')), 4000);
-      r.once('ready', () => { clearTimeout(t); resolve(); });
-      r.once('error', (e) => { clearTimeout(t); reject(e); });
-    }).catch(() => {});
-  }
+  try { await waitReady(r); } catch {}
 
-  // If username provided, resolve to current address
-  let resolvedAddress = address;
-  if (username && !address) {
-    try {
-      const raw = await r.get(`pmt:user:${username}`);
-      if (raw) {
-        const user = JSON.parse(raw);
-        resolvedAddress = user.address?.toLowerCase();
-      }
-    } catch {}
-  }
-
-  if (!resolvedAddress) {
-    if (req.method === 'GET') return res.status(200).json([]);
-    return res.status(404).json({ error: 'user not found' });
-  }
-
-  const key = `pmt:inbox:${resolvedAddress}`;
+  const key = `pmt:inbox:${address}`;
 
   try {
     if (req.method === 'GET') {
-      // Register heartbeat: address → username mapping
-      if (address) {
-        try {
-          if (username) await r.set(`pmt:addr:${address}`, username, 'EX', 86400);
-          await r.set(`pmt:online:${address}`, Date.now(), 'EX', 3600);
-        } catch {}
-      }
+      // Heartbeat: register this address as the current polling address for this user
+      // This builds the forwarding table for anyone who has an old address for this user
+      try {
+        await r.set(`pmt:online:${address}`, Date.now(), 'EX', 86400);
+        if (username) {
+          // Map username → this address (update pmt:user record's address field)
+          const userKey = `pmt:user:${username}`;
+          const raw = await r.get(userKey);
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u.address?.toLowerCase() !== address) {
+              // Address changed! Store forwarding from old to new
+              await r.set(`pmt:fwd:${u.address.toLowerCase()}`, address, 'EX', 2592000);
+              u.address = address;
+              await r.set(userKey, JSON.stringify(u));
+              console.log(`[inbox] address updated for ${username}: ${u.address} → ${address}`);
+            }
+          }
+        }
+      } catch {}
+
       const msgs = await r.lrange(key, 0, -1);
       if (msgs.length > 0) await r.del(key);
       const parsed = msgs.map(m => { try { return JSON.parse(m); } catch { return null; } }).filter(Boolean);
@@ -91,29 +127,16 @@ export default async function handler(req, res) {
       await new Promise(resolve => { req.on('data', c => body += c); req.on('end', resolve); });
       const msg = JSON.parse(body);
 
-      // If recipient username known, also deliver to their current registered address
-      const toUsername = msg.toUsername;
-      let deliveredTo = [resolvedAddress];
+      // Resolve all possible addresses for this recipient
+      const toUsername = (msg.toUsername || urlObj.searchParams.get('username') || '').toLowerCase().trim();
+      const addrs = await resolveDeliveryAddresses(r, address, toUsername || null);
 
-      if (toUsername) {
-        try {
-          const raw = await r.get(`pmt:user:${toUsername.toLowerCase()}`);
-          if (raw) {
-            const user = JSON.parse(raw);
-            const currentAddr = user.address?.toLowerCase();
-            if (currentAddr && currentAddr !== resolvedAddress) {
-              // Deliver to both old address and current registered address
-              await r.rpush(`pmt:inbox:${currentAddr}`, JSON.stringify(msg));
-              await r.expire(`pmt:inbox:${currentAddr}`, 604800);
-              deliveredTo.push(currentAddr);
-            }
-          }
-        } catch {}
+      let delivered = 0;
+      for (const addr of addrs) {
+        if (await deliver(r, addr, msg)) delivered++;
       }
 
-      await r.rpush(key, JSON.stringify(msg));
-      await r.expire(key, 604800);
-      return res.status(200).json({ ok: true, deliveredTo });
+      return res.status(200).json({ ok: true, delivered, addrs });
 
     } else {
       res.status(405).end();
