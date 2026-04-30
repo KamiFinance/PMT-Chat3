@@ -370,6 +370,14 @@ export default function App() {
     }
 
     // Blockchain delivery
+    // Debug: log why relay might be skipped
+    console.log('[PMT send check]', {
+      isGroup: activeRef.current?.isGroup,
+      isAI: activeRef.current?.isAI,
+      isDemo,
+      hasWallet: !!walletRef.current?.address,
+      walletAddr: walletRef.current?.address?.slice?.(0,10),
+    });
     if (!activeRef.current.isGroup && !activeRef.current.isAI && !isDemo && walletRef.current?.address) {
       const w = walletRef.current;
       const toAddr = normalizeAddress(activeRef.current.address);
