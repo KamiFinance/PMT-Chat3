@@ -253,13 +253,11 @@ export function useInboxPoll({
       if (!res.ok) return;
       const msgs: InboxMessage[] = await res.json();
       if (!msgs.length) return;
-      console.log('[PMT relay] received', msgs.length, 'msg(s):', msgs.map(m => `${(m as any).type}:${(m as any).id?.slice(0,8)}`).join(', '));
       // Write to localStorage inbox so processInbox handles them
       const inboxKey = `pmt_inbox_${wallet.address.toLowerCase()}`;
       const existing = JSON.parse(localStorage.getItem(inboxKey) ?? '[]');
       localStorage.setItem(inboxKey, JSON.stringify([...existing, ...msgs]));
       processInbox();
-      console.log('[PMT relay] processInbox done');
     } catch { /* offline or API not configured */ }
   }, [wallet?.address, processInbox]);
 
