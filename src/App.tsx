@@ -382,6 +382,7 @@ export default function App() {
       const msgContent = isVoice ? '🎙 Voice message' : isImage ? '🖼 Image' : isFile ? `📄 ${(input as Message).fileName ?? 'File'}` : input as string;
       const msgType = isVoice ? 'voice' : isImage ? 'image' : isFile ? 'file' : 'text';
       try {
+        console.log('[PMT relay] building inboxMsg, toAddr=', toAddr.slice(0,10));
         const inboxMsg = { id: msg.id, type: msg.type, text: msgContent, ...(isVoice && { duration: (input as Message).duration, waveform: (input as Message).waveform, audioMsgId: (input as Message).audioMsgId, ipfsCid: (input as Message).ipfsCid, ipfsUrl: (input as Message).ipfsUrl }), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
         const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
         localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
@@ -404,7 +405,9 @@ export default function App() {
             }).catch(() => {});
           }, 2000);
         });
-      } catch {}
+      } catch(relayErr: any) {
+        console.error('[PMT relay] ERROR building/sending:', relayErr?.message || String(relayErr));
+      }
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
         const { txHash, chain } = await broadcastMessage({ from: w.address, to: toAddr, msgHash, msgType, blockNum: block, useMetaMask: !!(w.isMetaMask), metaMaskProvider: realProviderRef.current || window.ethereum || null });
