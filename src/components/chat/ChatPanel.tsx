@@ -150,11 +150,9 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
   };
 
   const openFilePicker=(accept)=>{
-    console.log('[PMT attach] openFilePicker called, accept:', accept, 'ref:', fileInputRef.current);
     fileAcceptRef.current=accept;
     fileInputRef.current.accept=accept;
     fileInputRef.current.click();
-    console.log('[PMT attach] .click() called');
   };
 
   const handleFileChosen=e=>{
