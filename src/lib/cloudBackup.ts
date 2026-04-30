@@ -102,7 +102,11 @@ export async function loadCloudBackup(
   const ok = await PMTAuth.verifyPassword(password, record.passwordHash, record.salt);
   if (!ok) throw new Error('WRONG_PASSWORD');
 
-  if (!record.encryptedBackup) return null; // old account — no backup yet
+  if (!record.encryptedBackup) {
+    // User is registered but backup was never saved (e.g. first login after migration).
+    // Return a minimal record so they can log in — data will be empty but wallet address is known.
+    throw new Error('NO_BACKUP');
+  }
 
   const data = await decryptBackup(record.encryptedBackup, password, record.salt) as BackupData;
   // Attach the canonical salt so LoginScreen can persist it locally —

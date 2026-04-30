@@ -478,6 +478,35 @@ export default function App() {
     }
     setScreen('chat');
   }, [setContacts, setMsgs]);
+
+  // Trigger an immediate backup 3s after login (so contacts/msgs are loaded into state first)
+  // This ensures the backup fires even if the user doesn't change any data
+  useEffect(() => {
+    if (!wallet?.address || isDemo || !sessionPasswordRef.current) return;
+    const username = wallet.username;
+    if (!username) return;
+    const timer = setTimeout(async () => {
+      try {
+        const password = sessionPasswordRef.current;
+        if (!password) return;
+        const cleanMsgs: Record<string, object[]> = {};
+        Object.entries(msgs).forEach(([addr, arr]) => {
+          cleanMsgs[addr] = (arr as any[]).map(m => {
+            const { b64Data, audioUrl, fileUrl, imgData, fileData, uploading, _toAddr, ...keep } = m;
+            return keep;
+          });
+        });
+        await saveCloudBackup(username, password, {
+          wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
+          contacts,
+          messages: cleanMsgs,
+          profile: profileRef.current ?? {},
+        });
+      } catch { /* silent */ }
+    }, 3000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet?.address]);
   const handleDemo = useCallback(() => { setIsDemo(true); const w = { address: 'demo', balance: '2.847', network: 'PMT Chain', username: 'Demo' }; setWallet(w); walletRef.current = w; setScreen('chat'); }, []);
   const handleLogout = useCallback(() => { storage.clearSession(); setWallet(null); walletRef.current = null; setIsDemo(false); setContacts([]); setMsgs({}); setActiveAndRef(null); setScreen('landing'); }, [setActiveAndRef]);
 

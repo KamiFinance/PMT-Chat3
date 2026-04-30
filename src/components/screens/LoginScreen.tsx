@@ -63,7 +63,9 @@ export default function LoginScreen({onLogin,onBack}){
       }
     }catch(e){
       if(e.message==='WRONG_PASSWORD'||e.message?.includes('decrypt')||e.name==='OperationError')
-        setErr('Incorrect password.');
+        setErr('Incorrect password. Please try again.');
+      else if(e.message==='NO_BACKUP')
+        setErr('Account found but no backup saved yet. Log in on your other device first, then try here again.');
       else setErr('Login failed: '+e.message);
     }finally{setLoading(false);}
   };
