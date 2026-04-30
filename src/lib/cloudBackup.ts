@@ -1,77 +1,39 @@
 // @ts-nocheck
-// Cloud backup: encrypt full account data → Pinata IPFS → Redis registry
-// Zero-knowledge: password never leaves device, only hash + encrypted blob stored
+// Cloud backup — encrypt full account data → store directly in Redis via /api/auth
+// No Pinata/IPFS needed. Zero-knowledge: password never leaves device.
 
 import { PMTAuth } from './auth';
 
-// JWT resolved at call time from localStorage or env
+// ── Encrypt/decrypt ───────────────────────────────────────────────────────────
 
-// ── Encrypt/decrypt full backup ──────────────────────────────────────────────
-
-async function encryptBackup(data: object, password: string, salt: Uint8Array): Promise<string> {
+async function encryptBackup(data: object, password: string, saltHex: string): Promise<string> {
   const enc = new TextEncoder();
+  const toBytes = (h: string) => new Uint8Array((h.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)));
   const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
-    keyMat, { name: 'AES-GCM', length: 256 }, false, ['encrypt'] as KeyUsage[]
+    { name: 'PBKDF2', salt: toBytes(saltHex), iterations: 150000, hash: 'SHA-256' },
+    keyMat, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
   );
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(data)));
   const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
-  return JSON.stringify({ v: 2, encrypted: toHex(new Uint8Array(encrypted)), iv: toHex(iv) });
+  return JSON.stringify({ v: 3, encrypted: toHex(new Uint8Array(encrypted)), iv: toHex(iv) });
 }
 
-async function decryptBackup(blob: string, password: string, salt: string): Promise<object> {
+async function decryptBackup(blob: string, password: string, saltHex: string): Promise<object> {
   const { encrypted, iv } = JSON.parse(blob);
   const enc = new TextEncoder();
   const toBytes = (h: string) => new Uint8Array((h.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)));
   const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: toBytes(salt), iterations: 150000, hash: 'SHA-256' },
-    keyMat, { name: 'AES-GCM', length: 256 }, false, ['decrypt'] as KeyUsage[]
+    { name: 'PBKDF2', salt: toBytes(saltHex), iterations: 150000, hash: 'SHA-256' },
+    keyMat, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
   );
   const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toBytes(iv) }, key, toBytes(encrypted));
   return JSON.parse(new TextDecoder().decode(dec));
 }
 
-// ── Pinata upload/download ───────────────────────────────────────────────────
-
-async function uploadToIPFS(content: string): Promise<string> {
-  const { uploadToPinata } = await import('./pinata');
-  const blob = new Blob([content], { type: 'application/json' });
-  return uploadToPinata(blob, 'pmt_backup_' + Date.now() + '.json');
-}
-
-async function fetchFromIPFS(cid: string): Promise<string> {
-  const { fetchFromIpfs } = await import('./pinata');
-  const res = await fetchFromIpfs(cid);
-  return res.text();
-}
-
-// ── Registry API calls ───────────────────────────────────────────────────────
-
-async function registryGet(username: string): Promise<{ cid: string; passwordHash: string; salt: string; address: string } | null> {
-  try {
-    const res = await fetch(`/api/auth?username=${encodeURIComponent(username.toLowerCase().trim())}`);
-    if (res.status === 404) return null;
-    if (!res.ok) return null;
-    return await res.json();
-  } catch { return null; }
-}
-
-async function registrySet(username: string, cid: string, passwordHash: string, salt: string, address: string): Promise<void> {
-  const res = await fetch('/api/auth', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: username.toLowerCase().trim(), cid, passwordHash, salt, address }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Registry error: ${res.status}`);
-  }
-}
-
-// ── Public API ───────────────────────────────────────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────────────
 
 export interface BackupData {
   wallet: { address: string; privateKey?: string; username?: string };
@@ -81,58 +43,71 @@ export interface BackupData {
 }
 
 /**
- * Save encrypted backup to IPFS + register in Redis.
- * Called after account creation and periodically as data changes.
+ * Save encrypted backup directly to Redis via /api/auth.
+ * No Pinata/IPFS required — works with zero external config.
+ * Uses the stored passwordSalt so the hash is stable across saves.
  */
 export async function saveCloudBackup(
   username: string,
   password: string,
   data: BackupData
-): Promise<{ cid: string }> {
-  // 1. Derive salt and hash password for registry
-  const { hash: passwordHash, salt } = await PMTAuth.hashPassword(password);
-  const saltBytes = new Uint8Array((salt.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)));
+): Promise<void> {
+  const uname = username.toLowerCase().trim();
 
-  // 2. Encrypt the full backup
-  const encrypted = await encryptBackup(data, password, saltBytes);
+  // Reuse existing salt so passwordHash stays consistent (lets server verify ownership)
+  const accountKey = `pmt_account_${uname}`;
+  const stored = localStorage.getItem(accountKey);
+  const existingSalt = stored ? (JSON.parse(stored).passwordSalt ?? null) : null;
 
-  // 3. Upload to IPFS
-  const cid = await uploadToIPFS(encrypted);
+  const { hash: passwordHash, salt } = await PMTAuth.hashPassword(password, existingSalt ?? undefined);
 
-  // 4. Register in Redis (username → cid)
-  await registrySet(username, cid, passwordHash, salt, data.wallet.address);
+  // Encrypt the full backup with this salt
+  const encryptedBackup = await encryptBackup(data, password, salt);
 
-  return { cid };
+  const res = await fetch('/api/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: uname,
+      passwordHash,
+      salt,
+      address: data.wallet.address,
+      encryptedBackup,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Backup error: ${res.status}`);
+  }
 }
 
 /**
- * Load and decrypt backup from IPFS for cross-device login.
- * Returns null if user not found or password wrong.
+ * Load and decrypt backup from Redis for cross-device login.
+ * Returns null if user not found. Throws if password wrong.
  */
 export async function loadCloudBackup(
   username: string,
   password: string
 ): Promise<BackupData | null> {
-  // 1. Look up registry
-  const record = await registryGet(username);
-  if (!record) return null;
+  const res = await fetch(`/api/auth?username=${encodeURIComponent(username.toLowerCase().trim())}`);
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  const record = await res.json();
 
-  // 2. Verify password client-side (before downloading)
+  // Verify password before decrypting
   const ok = await PMTAuth.verifyPassword(password, record.passwordHash, record.salt);
   if (!ok) throw new Error('WRONG_PASSWORD');
 
-  // 3. Fetch encrypted blob from IPFS
-  const blob = await fetchFromIPFS(record.cid);
+  if (!record.encryptedBackup) return null; // old account — no backup yet
 
-  // 4. Decrypt
-  const data = await decryptBackup(blob, password, record.salt) as BackupData;
+  const data = await decryptBackup(record.encryptedBackup, password, record.salt) as BackupData;
   return data;
 }
 
 /**
- * Check if a username is already registered in the cloud.
+ * Check if a username is already registered.
  */
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
-  const record = await registryGet(username);
-  return record === null;
+  const res = await fetch(`/api/auth?username=${encodeURIComponent(username.toLowerCase().trim())}`);
+  return res.status === 404;
 }

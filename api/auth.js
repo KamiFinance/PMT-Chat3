@@ -1,5 +1,6 @@
-// User registry: username → { cid, passwordHash, salt, address }
+// User registry: username → { passwordHash, salt, address, encryptedBackup }
 // Pure fetch REST — no ioredis, no TCP connections
+// encryptedBackup stored directly in Redis (no Pinata/IPFS needed)
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,7 +9,6 @@ function cors(res) {
 }
 
 async function redis(cmd, ...args) {
-  // Try all common Upstash/Vercel KV env var name patterns
   const url = process.env.UPSTASH_KV_REST_API_URL
     || process.env.KV_REST_API_URL
     || process.env.UPSTASH_REDIS_REST_URL;
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
   try {
-    // GET /api/auth?username=xxx
+    // GET /api/auth?username=xxx — fetch record (for login / username check)
     if (req.method === 'GET') {
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const username = (urlObj.searchParams.get('username') || '').toLowerCase().trim();
@@ -42,23 +42,35 @@ export default async function handler(req, res) {
       return res.status(200).json(JSON.parse(raw));
     }
 
-    // POST /api/auth — register or update
+    // POST /api/auth — create or update account + backup
     if (req.method === 'POST') {
       let body = '';
       await new Promise(resolve => { req.on('data', c => body += c); req.on('end', resolve); });
-      const { username, cid, passwordHash, salt, address } = JSON.parse(body);
-      if (!username || !cid || !passwordHash || !salt || !address) {
+      const { username, passwordHash, salt, address, encryptedBackup, cid } = JSON.parse(body);
+      if (!username || !passwordHash || !salt || !address) {
         res.status(400).json({ error: 'Missing required fields' }); return;
       }
       const key = `pmt:user:${username.toLowerCase().trim()}`;
       const existing = await redis('GET', key);
       if (existing) {
         const prev = JSON.parse(existing);
+        // Allow update only if passwordHash matches (owner verification)
+        // Salt is fixed per account so hash is stable
         if (prev.passwordHash !== passwordHash) {
           res.status(403).json({ error: 'Username already taken' }); return;
         }
       }
-      const record = { username: username.toLowerCase().trim(), cid, passwordHash, salt, address, updated: Date.now() };
+      const record = {
+        username: username.toLowerCase().trim(),
+        passwordHash,
+        salt,
+        address,
+        // Store encrypted backup inline (replaces IPFS CID approach)
+        ...(encryptedBackup ? { encryptedBackup } : {}),
+        // Keep cid for backward compat if present
+        ...(cid ? { cid } : {}),
+        updated: Date.now(),
+      };
       await redis('SET', key, JSON.stringify(record));
       return res.status(200).json({ ok: true });
     }
