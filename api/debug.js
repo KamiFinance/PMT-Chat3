@@ -1,41 +1,55 @@
-function getUpstashCreds() {
-  const url = process.env.KV_REDIS_URL;
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    return { restUrl: `https://${u.hostname}`, token: u.password || u.username, raw: url.slice(0,30) };
-  } catch { return null; }
-}
+import Redis from 'ioredis';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
 
-  const creds = getUpstashCreds();
-  if (!creds) { res.status(200).json({ ok: false, error: 'KV_REDIS_URL not set' }); return; }
+  const restUrl = process.env.KV_REST_API_URL;
+  const restToken = process.env.KV_REST_API_TOKEN;
+  const tcpUrl = process.env.KV_REDIS_URL;
 
-  try {
-    const setRes = await fetch(creds.restUrl, {
-      method:'POST', headers:{'Authorization':`Bearer ${creds.token}`,'Content-Type':'application/json'},
-      body: JSON.stringify(['SET','pmt:debug:test','hello','EX','60'])
-    });
-    const setData = await setRes.json();
+  const info = {
+    hasRestUrl: !!restUrl,
+    hasRestToken: !!restToken,
+    hasTcpUrl: !!tcpUrl,
+    tcpUrlPrefix: tcpUrl?.slice(0,30) || null,
+  };
 
-    const getRes = await fetch(creds.restUrl, {
-      method:'POST', headers:{'Authorization':`Bearer ${creds.token}`,'Content-Type':'application/json'},
-      body: JSON.stringify(['GET','pmt:debug:test'])
-    });
-    const getData = await getRes.json();
-
-    res.status(200).json({
-      ok: true,
-      setStatus: setRes.status,
-      setResult: setData.result,
-      getResult: getData.result,
-      roundtrip: getData.result === 'hello',
-      urlPrefix: creds.raw
-    });
-  } catch (e) {
-    res.status(200).json({ ok: false, error: e.message, urlPrefix: creds.raw });
+  // Test REST if available
+  if (restUrl && restToken) {
+    try {
+      const r = await fetch(restUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${restToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(['SET', 'pmt:debug', 'ok', 'EX', '30'])
+      });
+      const d = await r.json();
+      const r2 = await fetch(restUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${restToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(['GET', 'pmt:debug'])
+      });
+      const d2 = await r2.json();
+      info.restTest = { set: d.result, get: d2.result, ok: d2.result === 'ok' };
+    } catch(e) { info.restTest = { error: e.message }; }
   }
+
+  // Test derived REST from KV_REDIS_URL
+  if (!restUrl && tcpUrl) {
+    try {
+      const u = new URL(tcpUrl);
+      const token = decodeURIComponent(u.password || u.username);
+      const derivedUrl = `https://${u.hostname}`;
+      info.derivedRestUrl = derivedUrl;
+      const r = await fetch(derivedUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(['SET', 'pmt:debug', 'ok', 'EX', '30'])
+      });
+      const d = await r.json();
+      info.derivedRestTest = { status: r.status, result: d.result, ok: d.result === 'OK' };
+    } catch(e) { info.derivedRestTest = { error: e.message }; }
+  }
+
+  res.status(200).json(info);
 }
