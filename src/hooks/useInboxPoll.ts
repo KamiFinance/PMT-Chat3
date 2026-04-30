@@ -9,6 +9,7 @@ import { now, rndHash, uid, normalizeAddress } from '../lib/utils';
 interface InboxMsgWithProfile extends InboxMessage {
   fromAvatarUrl?: string | null;
   fromBio?: string;
+  msgHash?: string; // reaction fallback: block hash (consistent across devices)
 }
 
 interface UseInboxPollParams {
@@ -112,7 +113,11 @@ export function useInboxPoll({
             const updated = { ...prev };
             Object.keys(updated).forEach(addr => {
               updated[addr] = (updated[addr] ?? []).map(m => {
-                if (m.id !== inboxMsg.msgId) return m;
+                // Primary match: by message ID (same across devices when relay preserved it)
+                // Fallback match: by message hash (block hash, always consistent)
+                const idMatch = m.id === inboxMsg.msgId;
+                const hashMatch = inboxMsg.msgHash && m.hash && m.hash === inboxMsg.msgHash;
+                if (!idMatch && !hashMatch) return m;
                 // Merge incoming reactions: keep our own reactions, apply sender's
                 const merged = { ...(m.reactions ?? {}), ...(inboxMsg.reactions ?? {}) };
                 return { ...m, reactions: merged };

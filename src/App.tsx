@@ -288,7 +288,9 @@ export default function App() {
           const reactions = { ...(m.reactions ?? {}) };
           reactions[emoji] = (reactions[emoji] ?? 0) === 1 ? 0 : 1;
           if (!isDemo && walletRef.current?.address) {
-            const rxnMsg = { id: `rxn_${Date.now()}`, type: 'reaction', msgId, emoji, reactions, from: walletRef.current.address, ts: Date.now() };
+            // Include msgHash as fallback identifier — handles cases where msgId differs across devices
+            // (can happen when messages arrived via different paths during relay outages)
+            const rxnMsg = { id: `rxn_${Date.now()}`, type: 'reaction', msgId, msgHash: m.hash, emoji, reactions, from: walletRef.current.address, ts: Date.now() };
             // Same-device delivery via localStorage
             try {
               const inbox: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(addr)) ?? '[]');
