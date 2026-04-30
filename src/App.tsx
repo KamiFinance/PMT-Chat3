@@ -376,9 +376,11 @@ export default function App() {
     // Blockchain delivery
     // Debug: log why relay might be skipped
     console.log('[PMT send check] isGroup=' + activeRef.current?.isGroup + ' isAI=' + activeRef.current?.isAI + ' isDemo=' + isDemo + ' wallet=' + (walletRef.current?.address ? walletRef.current.address.slice(0,10) : 'NONE'));
+    console.log('[PMT guard]', !activeRef.current.isGroup, !activeRef.current.isAI, !isDemo, !!walletRef.current?.address, 'addr=', activeRef.current?.address?.slice(0,10));
     if (!activeRef.current.isGroup && !activeRef.current.isAI && !isDemo && walletRef.current?.address) {
       const w = walletRef.current;
       const toAddr = normalizeAddress(activeRef.current.address);
+      console.log('[PMT guard ENTERED] toAddr=', toAddr.slice(0,10));
       const msgContent = isVoice ? '🎙 Voice message' : isImage ? '🖼 Image' : isFile ? `📄 ${(input as Message).fileName ?? 'File'}` : input as string;
       const msgType = isVoice ? 'voice' : isImage ? 'image' : isFile ? 'file' : 'text';
       try {
