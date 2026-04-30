@@ -117,7 +117,6 @@ export default function App() {
   const [active, setActive] = useState<Contact | null>(null);
   const activeRef = useRef<Contact | null>(null);
   const walletRef = useRef<Wallet | null>(null);
-  const realProviderRef = useRef<any>(null);
   const profileRef = useRef<Profile>({ name: '', bio: '', avatarUrl: null, address: null });
 
   const setActiveAndRef = useCallback((c: Contact | null) => {
@@ -307,13 +306,12 @@ export default function App() {
     setMsgs(p => ({ ...p, [addr]: [...(p[addr] ?? []), tx] }));
     setContacts(p => p.map(c => c.id === contact.id ? { ...c, preview: `◈ Sent ${amount} PMT` } : c));
 
-    if (!isDemo && walletRef.current?.address && (window.ethereum || realProviderRef.current)) {
+    if (!isDemo && walletRef.current?.address && window.ethereum) {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
-        const provider = realProviderRef.current || window.ethereum;
-        const txHash = await (provider as any).request({
+        const txHash = await (window.ethereum as any).request({
           method: 'eth_sendTransaction',
           params: [{ from: walletRef.current.address, to: addr, value: weiHex }],
         }) as string;
@@ -377,56 +375,32 @@ export default function App() {
       const toAddr = normalizeAddress(activeRef.current.address);
       const msgContent = isVoice ? '🎙 Voice message' : isImage ? '🖼 Image' : isFile ? `📄 ${(input as Message).fileName ?? 'File'}` : input as string;
       const msgType = isVoice ? 'voice' : isImage ? 'image' : isFile ? 'file' : 'text';
-      // Build relay message — text-only fields, no binary data that could fail JSON.stringify
-      const inboxMsg: Record<string,unknown> = {
-        id: msg.id,
-        type: msgType,
-        text: msgContent,
-        from: w.address,
-        fromName: profileRef.current?.name || w.username || w.address.slice(0, 8),
-        fromAvatarUrl: profileRef.current?.avatarUrl ?? null,
-        fromBio: profileRef.current?.bio ?? '',
-        time: now(),
-        block,
-        hash: msg.hash,
-        confirms: 0,
-        ts: Date.now(),
-        // Include recipient username so server can find their current address
-        toUsername: activeRef.current.username || null,
-      };
-      if (isVoice) {
-        inboxMsg.duration = (input as Message).duration;
-        inboxMsg.waveform = (input as Message).waveform;
-        inboxMsg.audioMsgId = (input as Message).audioMsgId;
-        inboxMsg.ipfsCid = (input as Message).ipfsCid;
-        inboxMsg.ipfsUrl = (input as Message).ipfsUrl;
-      }
-      if (isImage || isFile) {
-        inboxMsg.mediaMsgId = (input as Message).mediaMsgId;
-        inboxMsg.fileName = (input as Message).fileName;
-        inboxMsg.fileSize = (input as Message).fileSize;
-        inboxMsg.mimeType = (input as Message).mimeType;
-        inboxMsg.ipfsCid = (input as Message).ipfsCid ?? null;
-        // Skip b64Data — too large for relay; recipient fetches from IPFS
-      }
-      // Same-device delivery via localStorage
       try {
+        const inboxMsg = { id: msg.id, type: msg.type, text: msgContent, ...(isVoice && { duration: (input as Message).duration, waveform: (input as Message).waveform, audioMsgId: (input as Message).audioMsgId, ipfsCid: (input as Message).ipfsCid, ipfsUrl: (input as Message).ipfsUrl }), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
         const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
         localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
-      } catch { /* ignore localStorage errors */ }
-      // Cross-device delivery via API relay
-      try {
-        const body = JSON.stringify(inboxMsg);
-        const toUname = activeRef.current.username ? `&username=${encodeURIComponent(activeRef.current.username)}` : '';
-        fetch(`/api/inbox?address=${toAddr}${toUname}`, {
+        // Also deliver via cross-device API relay (fire-and-forget)
+        fetch(`/api/inbox?address=${toAddr}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body,
-        }).catch(() => {});
-      } catch { /* JSON.stringify failed — skip relay */ }
+          body: JSON.stringify(inboxMsg),
+        }).then(r => {
+          if (!r.ok) console.warn('[PMT relay] POST failed:', r.status);
+        }).catch(e => {
+          console.warn('[PMT relay] POST error:', e?.message);
+          // Retry once after 2 seconds
+          setTimeout(() => {
+            fetch(`/api/inbox?address=${toAddr}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(inboxMsg),
+            }).catch(() => {});
+          }, 2000);
+        });
+      } catch {}
       try {
         const msgHash = await hashMessage(w.address, toAddr, msgContent, Date.now());
-        const { txHash, chain } = await broadcastMessage({ from: w.address, to: toAddr, msgHash, msgType, blockNum: block, useMetaMask: !!(window.ethereum && w.isMetaMask), metaMaskProvider: realProviderRef.current || window.ethereum || null });
+        const { txHash, chain } = await broadcastMessage({ from: w.address, to: toAddr, msgHash, msgType, blockNum: block, useMetaMask: !!(window.ethereum && w.isMetaMask), metaMaskProvider: window.ethereum ?? null });
         setMsgs(p => ({ ...p, [toAddr]: (p[toAddr] ?? []).map(m => m.id === msg.id ? { ...m, hash: shortHash(txHash), chain, onChain: true } : m) }));
       } catch {}
     }
@@ -447,8 +421,6 @@ export default function App() {
   }, [accountKey]);
 
   const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any }) => {
-    setIsDemo(false);
-    realProviderRef.current = (w as any)._provider || window.ethereum || null;
     setWallet(w);
     walletRef.current = w;
     // If cloud restore: seed contacts and messages
@@ -480,8 +452,6 @@ export default function App() {
                 }
               } catch {}
 
-              setIsDemo(false);
-              realProviderRef.current = (w as any)._provider || window.ethereum || null;
               if (savedAcct || sessMatch) {
                 // Returning user — go straight to chat
                 try {

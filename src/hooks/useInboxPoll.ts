@@ -191,17 +191,6 @@ export function useInboxPoll({
             );
           }
 
-          // Also check if any contact has the same name but OLD address — update to new address
-          // This handles the case where user re-logged in with a new wallet
-          const senderName = inboxMsg.fromName;
-          if (senderName) {
-            updated = updated.map(c =>
-              c.name === senderName && normalizeAddress(c.address) !== senderAddr
-                ? { ...c, address: senderAddr }
-                : c
-            );
-          }
-
           // Show notification
           const sender = updated.find(c => normalizeAddress(c.address) === senderAddr);
           if (sender) pushNotif(sender, previewText(inboxMsg));
@@ -221,8 +210,7 @@ export function useInboxPoll({
   const processApiInbox = useCallback(async () => {
     if (!wallet?.address) return;
     try {
-      const uname = wallet.username ? `&username=${encodeURIComponent(wallet.username)}` : '';
-      const res = await fetch(`/api/inbox?address=${wallet.address.toLowerCase()}${uname}&t=${Date.now()}`);
+      const res = await fetch(`/api/inbox?address=${wallet.address.toLowerCase()}&t=${Date.now()}`);
       if (!res.ok) return;
       const msgs: InboxMessage[] = await res.json();
       if (!msgs.length) return;
