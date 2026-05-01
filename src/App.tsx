@@ -230,7 +230,7 @@ export default function App() {
         // Strip binary blobs from messages before backup (keep metadata + IPFS CIDs)
         const cleanMsgs: Record<string, object[]> = {};
         Object.entries(msgs).forEach(([addr, arr]) => {
-          cleanMsgs[addr] = (arr as any[]).slice(-50).map(m => {
+          cleanMsgs[addr] = (arr as any[]).slice(addr === AI_AGENT_ADDRESS.toLowerCase() ? -100 : -50).map(m => {
             const { b64Data, audioUrl, fileUrl, imgData, fileData,
                     uploading, _toAddr, waveform, audioB64, ...keep } = m;
             return keep;
@@ -517,7 +517,9 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
     if (w.sessionPassword) sessionPasswordRef.current = w.sessionPassword;
     // If cloud restore: seed contacts and messages
     if (w.restoredContacts?.length) {
-      setContacts(w.restoredContacts);
+      // Always ensure AI agent contact is present after restore
+      const hasAI = w.restoredContacts.some((c: any) => c.isAI);
+      setContacts(hasAI ? w.restoredContacts : [AI_AGENT_CONTACT, ...w.restoredContacts]);
     }
     if (w.restoredMessages && Object.keys(w.restoredMessages).length) {
       setMsgs(w.restoredMessages as MsgsMap);
@@ -555,7 +557,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
         if (!password) return;
         const cleanMsgs: Record<string, object[]> = {};
         Object.entries(msgs).forEach(([addr, arr]) => {
-          cleanMsgs[addr] = (arr as any[]).slice(-50).map(m => {
+          cleanMsgs[addr] = (arr as any[]).slice(addr === AI_AGENT_ADDRESS.toLowerCase() ? -100 : -50).map(m => {
             const { b64Data, audioUrl, fileUrl, imgData, fileData,
                     uploading, _toAddr, waveform, audioB64, ...keep } = m;
             return keep;
@@ -652,7 +654,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
                     sessionPasswordRef.current=backupPromptPassword;
                     const cleanMsgs:Record<string,object[]>={};
                     Object.entries(msgs).forEach(([addr,arr])=>{
-                      cleanMsgs[addr]=(arr as any[]).slice(-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
+                      cleanMsgs[addr]=(arr as any[]).slice(addr===AI_AGENT_ADDRESS.toLowerCase()?-100:-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
                     });
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
@@ -680,7 +682,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
                     sessionPasswordRef.current=backupPromptPassword;
                     const cleanMsgs:Record<string,object[]>={};
                     Object.entries(msgs).forEach(([addr,arr])=>{
-                      cleanMsgs[addr]=(arr as any[]).slice(-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
+                      cleanMsgs[addr]=(arr as any[]).slice(addr===AI_AGENT_ADDRESS.toLowerCase()?-100:-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
                     });
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
