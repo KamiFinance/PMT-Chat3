@@ -394,7 +394,7 @@ export default function App() {
         fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': aiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-          body: JSON.stringify({ model: AI_MODEL, max_tokens: 1500, system: `You are PMT AI Assistant, a helpful AI built into PMT-Chat — a decentralized, end-to-end encrypted blockchain messenger. You are powered by Claude (Anthropic).
+          body: JSON.stringify({ model: AI_MODEL, max_tokens: 1500, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: `You are PMT AI Assistant, a helpful AI built into PMT-Chat — a decentralized, end-to-end encrypted blockchain messenger. You are powered by Claude (Anthropic).
 
 You can answer ANY question: crypto, blockchain, coding, math, science, history, philosophy, advice, creative writing, general knowledge — anything. Be concise, friendly, and direct.
 
@@ -439,7 +439,10 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
         })
         .then(r => r.json())
         .then(data => {
-          const reply: string = data.content?.[0]?.text ?? 'Sorry, I could not respond right now.';
+          const reply: string = (data.content ?? [])
+            .filter((b: any) => b.type === 'text')
+            .map((b: any) => b.text)
+            .join('') || 'Sorry, I could not respond right now.';
           setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).filter(m => m.id !== typingId).concat({ id: `ai_${Date.now()}`, out: false, type: 'text', text: reply, time: now(), block, confirms: 3, hash: rndHash() }) }));
           setContacts(p => p.map(c => c.isAI ? { ...c, preview: reply.slice(0, 50) + (reply.length > 50 ? '...' : '') } : c));
         })
