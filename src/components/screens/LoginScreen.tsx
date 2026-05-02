@@ -9,6 +9,11 @@ export default function LoginScreen({onLogin,onBack}){
   const [password,setPassword]=useState('');
   const [err,setErr]=useState(null);
   const [loading,setLoading]=useState(false);
+  // After password verified, hold wallet data here until wallet ownership confirmed
+  const [pendingLogin,setPendingLogin]=useState(null);
+  const [verifyStep,setVerifyStep]=useState(false);
+  const [verifyErr,setVerifyErr]=useState(null);
+  const [verifying,setVerifying]=useState(false);
 
   // Check if there are saved accounts
   const savedAccounts=[];
@@ -34,8 +39,10 @@ export default function LoginScreen({onLogin,onBack}){
         if(!ok)return setErr('Incorrect password. Please try again.');
         const walletData=await PMTAuth.decryptWallet(account.encryptedWallet,password);
         localStorage.setItem('pmt_session',JSON.stringify({username:account.username,address:account.address}));
-        onLogin({address:walletData.address,privateKey:walletData.privateKey,
+        // Password verified — now require wallet ownership confirmation
+        setPendingLogin({address:walletData.address,privateKey:walletData.privateKey,
           balance:'0.0000',network:'PMT Chain',username:account.username,sessionPassword:password});
+        setVerifyStep(true);
       } else {
         // Cloud restore: account not on this device — try IPFS backup
         setErr('Checking cloud backup…');
@@ -54,12 +61,13 @@ export default function LoginScreen({onLogin,onBack}){
         localStorage.setItem('pmt_account_'+username.trim().toLowerCase(), JSON.stringify(acctData));
         localStorage.setItem('pmt_account_'+w.address.toLowerCase(), JSON.stringify(acctData));
         localStorage.setItem('pmt_session', JSON.stringify({username: username.trim().toLowerCase(), address: w.address}));
-        onLogin({ address: w.address, privateKey: w.privateKey ?? '', balance:'0.0000',
+        setPendingLogin({ address: w.address, privateKey: w.privateKey ?? '', balance:'0.0000',
           network:'PMT Chain', username: username.trim().toLowerCase(),
           sessionPassword: password,
           restoredContacts: contacts ?? [],
           restoredMessages: messages ?? {},
           restoredProfile: profile ?? {} });
+        setVerifyStep(true);
       }
     }catch(e){
       if(e.message==='WRONG_PASSWORD'||e.message?.includes('decrypt')||e.name==='OperationError')
@@ -69,6 +77,68 @@ export default function LoginScreen({onLogin,onBack}){
       else setErr('Login failed: '+e.message);
     }finally{setLoading(false);}
   };
+
+  const connectAndVerify=async()=>{
+    setVerifying(true);setVerifyErr(null);
+    try{
+      // Try MetaMask / injected wallet first
+      if(window.ethereum){
+        const accounts=await window.ethereum.request({method:'eth_requestAccounts'});
+        const connected=(accounts[0]||'').toLowerCase();
+        const expected=(pendingLogin.address||'').toLowerCase();
+        if(connected!==expected){
+          setVerifyErr(`Wrong wallet connected.\nExpected: ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}`);
+          setVerifying(false);return;
+        }
+        onLogin(pendingLogin);return;
+      }
+      setVerifyErr('No wallet found. Please install MetaMask or use WalletConnect.');
+    }catch(e){
+      setVerifyErr(e.code===4001?'Connection rejected. Please approve the request in your wallet.':'Wallet connection failed: '+e.message);
+    }finally{setVerifying(false);}
+  };
+
+  // Wallet verification step
+  if(verifyStep&&pendingLogin) return(
+    <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',
+      background:'var(--bg)',padding:'16px'}}>
+      <div style={{width:'100%',maxWidth:400,background:'var(--panel)',border:'1px solid var(--border)',
+        borderRadius:16,padding:'24px 20px',display:'flex',flexDirection:'column',gap:18}}>
+        <div style={{fontSize:18,fontWeight:600}}>Confirm your wallet</div>
+        <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.6}}>
+          Connect the wallet associated with this account to confirm ownership before logging in.
+        </div>
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,
+          padding:'12px 14px',display:'flex',flexDirection:'column',gap:4}}>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:'var(--mono)',letterSpacing:'1px'}}>EXPECTED WALLET</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--accent)',wordBreak:'break-all'}}>
+            {pendingLogin.address}
+          </div>
+        </div>
+        {verifyErr&&(
+          <div style={{background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.3)',
+            borderRadius:8,padding:'10px 12px',fontSize:12,color:'var(--danger)',whiteSpace:'pre-line'}}>
+            {verifyErr}
+          </div>
+        )}
+        <button onClick={connectAndVerify} disabled={verifying}
+          style={{padding:'13px',background:'var(--accent)',border:'none',borderRadius:10,
+            color:'#0a0c14',fontWeight:600,fontSize:14,cursor:'pointer',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+            opacity:verifying?0.7:1}}>
+          {verifying
+            ?<><span style={{width:14,height:14,border:'2px solid rgba(0,0,0,.3)',borderTopColor:'#0a0c14',
+                borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>Connecting...</>
+            :'🔐 Connect & Verify Wallet'}
+        </button>
+        <button onClick={()=>{setVerifyStep(false);setPendingLogin(null);setVerifyErr(null);}}
+          style={{padding:'10px',background:'transparent',border:'1px solid var(--border)',
+            borderRadius:9,color:'var(--muted)',cursor:'pointer',fontSize:13}}>
+          ← Back to Login
+        </button>
+      </div>
+    </div>
+  );
 
   return(
     <div style={{height:'100%',display:'flex',alignItems:'flex-start',justifyContent:'center',
