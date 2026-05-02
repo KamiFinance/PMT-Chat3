@@ -67,13 +67,11 @@ function SwitchNetworkButton() {
         if (e.code === 4902 || e.code === -32603) addChain();
         else done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed');
       });
-    if (!eth.selectedAddress) {
-      eth.request({ method: 'eth_requestAccounts' })
-        .then(() => switchChain())
-        .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || ''));
-    } else {
-      switchChain();
-    }
+    // Always request accounts first — wallet_switchEthereumChain silently
+    // succeeds without doing anything if the site has no active connection
+    eth.request({ method: 'eth_requestAccounts' })
+      .then(() => switchChain())
+      .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || ''));
     }); // getEthProvider
   };
 
