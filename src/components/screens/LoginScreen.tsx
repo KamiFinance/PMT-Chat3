@@ -78,25 +78,49 @@ export default function LoginScreen({onLogin,onBack}){
     }finally{setLoading(false);}
   };
 
-  const connectAndVerify=async()=>{
+  const connectAndVerify=async(provider,walletName)=>{
     setVerifying(true);setVerifyErr(null);
     try{
-      // Try MetaMask / injected wallet first
-      if(window.ethereum){
-        const accounts=await window.ethereum.request({method:'eth_requestAccounts'});
-        const connected=(accounts[0]||'').toLowerCase();
-        const expected=(pendingLogin.address||'').toLowerCase();
-        if(connected!==expected){
-          setVerifyErr(`Wrong wallet connected.\nExpected: ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}`);
-          setVerifying(false);return;
-        }
-        onLogin(pendingLogin);return;
+      // Mirror Landing's connectWith — works with any injected wallet
+      let accounts=[];
+      try{accounts=await provider.request({method:'eth_accounts'});}catch{}
+      if(!accounts?.length) accounts=await provider.request({method:'eth_requestAccounts'});
+      if(!accounts?.length) throw new Error('No accounts returned from wallet');
+      const connected=(accounts[0]||'').toLowerCase();
+      const expected=(pendingLogin.address||'').toLowerCase();
+      if(connected!==expected){
+        setVerifyErr(`Wrong wallet connected.\nExpected:  ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}`);
+        return;
       }
-      setVerifyErr('No wallet found. Please install MetaMask or use WalletConnect.');
+      onLogin(pendingLogin);
     }catch(e){
-      setVerifyErr(e.code===4001?'Connection rejected. Please approve the request in your wallet.':'Wallet connection failed: '+e.message);
+      if(e.code===4001) setVerifyErr('Connection rejected — please approve in your wallet.');
+      else if(e.code===-32002) setVerifyErr('Wallet has a pending request — open your wallet and approve it.');
+      else setVerifyErr('Connection failed: '+(e.message||String(e)));
     }finally{setVerifying(false);}
   };
+
+  // Detect available wallets (EIP-6963 + legacy window.ethereum)
+  const [detectedWallets,setDetectedWallets]=React.useState([]);
+  React.useEffect(()=>{
+    if(!verifyStep) return;
+    const found=[];
+    const onAnnounce=e=>{
+      const{info,provider}=e.detail;
+      if(!found.find(w=>w.uuid===info.uuid)){found.push({...info,provider});setDetectedWallets([...found]);}
+    };
+    window.addEventListener('eip6963:announceProvider',onAnnounce);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    setTimeout(()=>window.dispatchEvent(new Event('eip6963:requestProvider')),400);
+    // Also add legacy window.ethereum if no EIP-6963 wallets found
+    setTimeout(()=>{
+      if(found.length===0&&window.ethereum){
+        const name=window.ethereum.isMetaMask?'MetaMask':window.ethereum.isTrust?'Trust Wallet':'Wallet';
+        setDetectedWallets([{uuid:'legacy',name,icon:null,provider:window.ethereum}]);
+      }
+    },600);
+    return()=>window.removeEventListener('eip6963:announceProvider',onAnnounce);
+  },[verifyStep]);
 
   // Wallet verification step
   if(verifyStep&&pendingLogin) return(
@@ -121,16 +145,24 @@ export default function LoginScreen({onLogin,onBack}){
             {verifyErr}
           </div>
         )}
-        <button onClick={connectAndVerify} disabled={verifying}
-          style={{padding:'13px',background:'var(--accent)',border:'none',borderRadius:10,
-            color:'#0a0c14',fontWeight:600,fontSize:14,cursor:'pointer',
-            display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-            opacity:verifying?0.7:1}}>
-          {verifying
-            ?<><span style={{width:14,height:14,border:'2px solid rgba(0,0,0,.3)',borderTopColor:'#0a0c14',
-                borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>Connecting...</>
-            :'🔐 Connect & Verify Wallet'}
-        </button>
+        {/* Show detected wallet buttons */}
+        {detectedWallets.length>0
+          ? detectedWallets.map(w=>(
+              <button key={w.uuid} onClick={()=>connectAndVerify(w.provider,w.name)} disabled={verifying}
+                style={{padding:'13px',background:'var(--accent)',border:'none',borderRadius:10,
+                  color:'#0a0c14',fontWeight:600,fontSize:14,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+                  opacity:verifying?0.7:1}}>
+                {verifying
+                  ?<><span style={{width:14,height:14,border:'2px solid rgba(0,0,0,.3)',borderTopColor:'#0a0c14',
+                      borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>Connecting...</>
+                  :<>🔐 Connect with {w.name}</>}
+              </button>
+            ))
+          : <div style={{fontSize:12,color:'var(--muted)',textAlign:'center',padding:'8px 0'}}>
+              Waiting for wallet... Make sure MetaMask or another wallet is installed.
+            </div>
+        }
         <button onClick={()=>{setVerifyStep(false);setPendingLogin(null);setVerifyErr(null);}}
           style={{padding:'10px',background:'transparent',border:'1px solid var(--border)',
             borderRadius:9,color:'var(--muted)',cursor:'pointer',fontSize:13}}>
