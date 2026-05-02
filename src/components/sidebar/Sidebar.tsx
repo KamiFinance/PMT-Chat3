@@ -8,9 +8,11 @@ import ProfilePic from '../ui/ProfilePic';
 
 
 function SwitchNetworkButton() {
-  const [status, setStatus] = React.useState('idle'); // idle | switching | done | error
-  const [errMsg, setErrMsg] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState('');
   const [currentChain, setCurrentChain] = React.useState('');
+  const [switching, setSwitching] = React.useState(false);
+
   React.useEffect(() => {
     const eth = (window as any).ethereum;
     if (!eth) return;
@@ -19,6 +21,33 @@ function SwitchNetworkButton() {
     eth.on?.('chainChanged', onChange);
     return () => eth.removeListener?.('chainChanged', onChange);
   }, []);
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(''), 2000); });
+  };
+
+  const tryAutoSwitch = () => {
+    setSwitching(true);
+    // Try each discovered EIP-6963 provider
+    const providers: any[] = [];
+    const h = (e: any) => providers.push(e.detail);
+    window.addEventListener('eip6963:announceProvider', h);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    setTimeout(() => {
+      window.removeEventListener('eip6963:announceProvider', h);
+      const mm = providers.find((p: any) => p.info?.rdns === 'io.metamask');
+      const eth = mm?.provider || (window as any).ethereum;
+      if (!eth) { setSwitching(false); setOpen(true); return; }
+      const PMT = { chainId:'0x46df2', chainName:'PMT Chain',
+        nativeCurrency:{name:'PMT',symbol:'PMT',decimals:18},
+        rpcUrls:['https://node1-ipm.dweb3.wtf'],
+        blockExplorerUrls:['https://explorer.publicmasterpiece.com'] };
+      eth.request({method:'eth_requestAccounts'})
+        .then(() => eth.request({method:'wallet_addEthereumChain', params:[PMT]}))
+        .then(() => setSwitching(false))
+        .catch(() => { setSwitching(false); setOpen(true); });
+    }, 400);
+  };
 
   const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMT Chain',
     nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
@@ -48,31 +77,55 @@ function SwitchNetworkButton() {
   };
 
   const onPMT = currentChain === '0x46df2';
-  const label = status === 'switching' ? '⏳ Check MetaMask... (click to cancel)'
-    : status === 'error' ? `⚠ ${errMsg}`
-    : onPMT ? '✓ On PMT Chain'
-    : '⛓ Switch to PMT Chain';
-
-  const bg = onPMT ? 'rgba(74,222,128,.08)'
-    : status === 'error' ? 'rgba(248,113,113,.1)'
-    : 'var(--surface)';
-
-  const color = onPMT ? 'var(--accent3)'
-    : status === 'error' ? 'var(--danger)'
-    : 'var(--accent2)';
-
+  const details = [
+    {label:'Network Name', value:'PMT Chain'},
+    {label:'RPC URL', value:'https://node1-ipm.dweb3.wtf'},
+    {label:'Chain ID', value:'290290'},
+    {label:'Currency Symbol', value:'PMT'},
+    {label:'Block Explorer', value:'https://explorer.publicmasterpiece.com'},
+  ];
   return (
-    <button onClick={doSwitch}
-      style={{margin:'0 10px 6px',padding:'9px 12px',background:bg,
-        border:`1px solid ${status==='done'?'rgba(74,222,128,.3)':status==='error'?'rgba(248,113,113,.3)':'var(--border)'}`,
-        borderRadius:9,color,fontSize:12,fontWeight:600,cursor:status==='switching'?'default':'pointer',
-        display:'flex',alignItems:'center',justifyContent:'center',gap:7,flexShrink:0,
-        transition:'all .15s',opacity:status==='switching'?0.7:1}}>
-      {status === 'switching' && <span style={{width:10,height:10,border:'2px solid rgba(255,255,255,.2)',borderTopColor:color,borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>}
-      {label}
-    </button>
+    <div style={{margin:'0 10px 6px',flexShrink:0}}>
+      <button onClick={onPMT ? undefined : tryAutoSwitch}
+        style={{width:'100%',padding:'9px 12px',
+          background:onPMT?'rgba(74,222,128,.08)':'var(--surface)',
+          border:`1px solid ${onPMT?'rgba(74,222,128,.3)':'var(--border)'}`,
+          borderRadius:9,color:onPMT?'var(--accent3)':'var(--accent2)',
+          fontSize:12,fontWeight:600,cursor:onPMT?'default':'pointer',
+          display:'flex',alignItems:'center',justifyContent:'center',gap:7,
+          transition:'all .15s',opacity:switching?0.7:1}}>
+        {switching && <span style={{width:10,height:10,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'var(--accent2)',borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>}
+        {onPMT ? '✓ On PMT Chain' : switching ? '⏳ Check MetaMask...' : '⛓ Switch to PMT Chain'}
+      </button>
+      {!onPMT && (
+        <button onClick={()=>setOpen((v: boolean)=>!v)}
+          style={{width:'100%',marginTop:4,padding:'6px',background:'transparent',
+            border:'none',color:'var(--muted)',fontSize:11,cursor:'pointer',textAlign:'center'}}>
+          {open ? 'Hide manual setup' : '+ Add PMT Chain manually'}
+        </button>
+      )}
+      {open && !onPMT && (
+        <div style={{marginTop:4,background:'var(--surface)',border:'1px solid var(--border)',
+          borderRadius:9,padding:'10px 12px',display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontSize:11,color:'var(--text2)',marginBottom:2}}>MetaMask → Add Network → Add manually:</div>
+          {details.map(({label,value}: {label:string,value:string})=>(
+            <div key={label} style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:10,color:'var(--muted)',width:88,flexShrink:0}}>{label}</span>
+              <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{value}</span>
+              <button onClick={()=>{navigator.clipboard.writeText(value);setCopied(label);setTimeout(()=>setCopied(''),2000);}}
+                style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,
+                  padding:'2px 6px',fontSize:10,color:copied===label?'var(--accent3)':'var(--muted)',
+                  cursor:'pointer',flexShrink:0}}>
+                {copied===label?'✓':'Copy'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
+
 
 export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onProfile,onSettings,onWallet,onLogout,wallet,isDemo,profile,onEditContact,onSearch,mobileOpen,onMobileClose}){
   const [q,setQ]=useState('');
