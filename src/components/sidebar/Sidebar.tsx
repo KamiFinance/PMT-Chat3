@@ -12,34 +12,28 @@ function SwitchNetworkButton() {
     const eth = (window as any).ethereum;
     if (!eth) return;
     setStatus('switching'); setErrMsg('');
-    // Fire the MetaMask request synchronously inside the click handler (no await before it)
-    const req = eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] });
-    req.then(() => {
-      setStatus('done');
-      setTimeout(() => setStatus('idle'), 3000);
-    }).catch((e: any) => {
-      if (e.code === 4902 || e.code === -32603) {
-        // Chain not added — add it
-        eth.request({
-          method: 'wallet_addEthereumChain',
-          params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
-            nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-            rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
-            blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
-        }).then(() => {
-          setStatus('done');
-          setTimeout(() => setStatus('idle'), 3000);
-        }).catch((e2: any) => {
-          setStatus('error');
-          setErrMsg(e2.code === 4001 ? 'Rejected' : e2.message?.slice(0,40) || 'Failed');
-        });
-      } else if (e.code === 4001) {
-        setStatus('idle');
-      } else {
-        setStatus('error');
-        setErrMsg(e.message?.slice(0,40) || 'Failed');
-      }
-    });
+    const PMT_CHAIN = { chainId: '0x46c52', chainName: 'PMT Chain',
+      nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+      rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+      blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
+    const addChain = () => eth.request({ method: 'wallet_addEthereumChain', params: [PMT_CHAIN] })
+      .then(() => { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); })
+      .catch((e: any) => { setStatus('error'); setErrMsg(e.code === 4001 ? 'Rejected' : e.message?.slice(0,50) || 'Failed'); });
+    const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] })
+      .then(() => { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); })
+      .catch((e: any) => {
+        if (e.code === 4902 || e.code === -32603) addChain();
+        else if (e.code === 4001) setStatus('idle');
+        else { setStatus('error'); setErrMsg(e.message?.slice(0,50) || 'Failed'); }
+      });
+    // Must connect first if no account selected
+    if (!eth.selectedAddress) {
+      eth.request({ method: 'eth_requestAccounts' })
+        .then(() => switchChain())
+        .catch((e: any) => { setStatus('idle'); setErrMsg(e.code === 4001 ? '' : e.message?.slice(0,50) || ''); });
+    } else {
+      switchChain();
+    }
   };
 
   const label = status === 'switching' ? 'Check MetaMask...'

@@ -371,16 +371,17 @@ export default function App() {
     setMsgs(p => ({ ...p, [addr]: [...(p[addr] ?? []), tx] }));
     setContacts(p => p.map(c => c.id === contact.id ? { ...c, preview: `◈ Sent ${amount} PMT` } : c));
 
-    if (!isDemo && walletRef.current?.address && window.ethereum) {
+    if (!isDemo && walletRef.current?.address) {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
-        const eth = window.ethereum as any;
+        const eth = (window as any).ethereum;
+        if (!eth) throw new Error('No wallet found. Please install MetaMask or use WalletConnect to send PMT.');
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
-        // Fire eth_requestAccounts synchronously in the click handler so MetaMask opens
+        // Connect if needed
         const accounts = await eth.request({ method: 'eth_requestAccounts' });
         const fromAddr = accounts?.[0] ?? walletRef.current.address;
-        // Switch to PMT Chain — MetaMask will show switch/add popup
+        // Switch to PMT Chain
         try {
           await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] });
         } catch (switchErr: any) {
