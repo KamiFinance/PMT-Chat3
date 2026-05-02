@@ -250,14 +250,20 @@ export default function App() {
         const enrichedCtx = contacts.map((ct: any) => {
           try {
             const p = JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`) ?? 'null');
-            return p ? { ...ct, avatarUrl: ct.avatarUrl || p.avatarUrl || null, bio: ct.bio || p.bio || '' } : ct;
+            // Only keep https avatar URLs in backup — base64 avatars are too large
+          const av = ct.avatarUrl || p.avatarUrl || null;
+          return { ...ct, avatarUrl: (av?.startsWith?.('http') ? av : null), bio: ct.bio || p.bio || '' };
           } catch { return ct; }
         });
         await saveCloudBackup(username, password, {
           wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
           contacts: enrichedCtx,
           messages: cleanMsgs,
-          profile: profileRef.current ?? {},
+          profile: profileRef.current ? {
+            ...profileRef.current,
+            // Strip base64 avatars from backup — too large for Redis
+            avatarUrl: profileRef.current.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null,
+          } : {},
         });
       } catch { /* offline or Pinata unavailable — silent */ }
     }, 8000);
@@ -483,7 +489,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
           // If no IPFS CID, include the base64 audio directly so recipient can play it cross-device
           const audioB64 = (!vi.ipfsCid && vi.audioMsgId) ? (() => { try { return storage.getAudio(vi.audioMsgId!); } catch { return null; } })() : null;
           return { duration: vi.duration, waveform: vi.waveform, audioMsgId: vi.audioMsgId, ipfsCid: vi.ipfsCid, ipfsUrl: vi.ipfsUrl, ...(audioB64 ? { audioB64 } : {}) };
-        })()), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: profileRef.current?.avatarUrl ?? null, fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
+        })()), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: (profileRef.current?.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null), fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
         const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
         localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
         // Also deliver via cross-device API relay (fire-and-forget)
@@ -651,14 +657,20 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
         const enrichedCtx = contacts.map((ct: any) => {
           try {
             const p = JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`) ?? 'null');
-            return p ? { ...ct, avatarUrl: ct.avatarUrl || p.avatarUrl || null, bio: ct.bio || p.bio || '' } : ct;
+            // Only keep https avatar URLs in backup — base64 avatars are too large
+          const av = ct.avatarUrl || p.avatarUrl || null;
+          return { ...ct, avatarUrl: (av?.startsWith?.('http') ? av : null), bio: ct.bio || p.bio || '' };
           } catch { return ct; }
         });
         await saveCloudBackup(username, password, {
           wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
           contacts: enrichedCtx,
           messages: cleanMsgs,
-          profile: profileRef.current ?? {},
+          profile: profileRef.current ? {
+            ...profileRef.current,
+            // Strip base64 avatars from backup — too large for Redis
+            avatarUrl: profileRef.current.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null,
+          } : {},
         });
       } catch { /* silent */ }
     }, 3000);
