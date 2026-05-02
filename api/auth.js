@@ -18,9 +18,15 @@ async function redis(cmd, ...args) {
 
   if (!url || !token) throw new Error('No Redis REST credentials found');
 
-  const path = [cmd, ...args].map(a => encodeURIComponent(String(a))).join('/');
-  const res = await fetch(`${url}/${path}`, {
-    headers: { Authorization: `Bearer ${token}` }
+  // Use POST body instead of URL path — avoids 431 "URL too long" for large values
+  // Upstash REST API accepts: POST / with body [cmd, ...args]
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify([cmd, ...args]),
   });
   if (!res.ok) throw new Error(`Redis HTTP ${res.status}`);
   const data = await res.json();
