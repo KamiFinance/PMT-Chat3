@@ -33,8 +33,15 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
     setVerifying(true); setErr(null);
     try {
       if (!window.ethereum) { setErr('No wallet found. Use WalletConnect below.'); return; }
-      // Always request accounts — opens wallet popup if not already connected
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      // wallet_requestPermissions ALWAYS opens MetaMask even if already connected
+      // Then eth_accounts retrieves the selected account
+      try {
+        await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+      } catch (permErr) {
+        if (permErr.code === 4001) { setErr('Connection rejected — please approve in your wallet.'); return; }
+        // Wallet doesn't support wallet_requestPermissions — fall through to eth_requestAccounts
+      }
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
       checkAddress(accounts);
     } catch (e) {
       if (e.message === 'WRONG_ADDRESS') {

@@ -94,7 +94,13 @@ export default function LoginScreen({onLogin,onBack}){
   const connectAndVerify=async(provider,walletName)=>{
     setVerifying(true);setVerifyErr(null);
     try{
-      const accounts=await provider.request({method:'eth_requestAccounts'});
+      // wallet_requestPermissions ALWAYS opens MetaMask even if already connected
+      try{
+        await provider.request({method:'wallet_requestPermissions',params:[{eth_accounts:{}}]});
+      }catch(permErr){
+        if(permErr.code===4001){setVerifyErr('Connection rejected — please approve in your wallet.');setVerifying(false);return;}
+      }
+      const accounts=await provider.request({method:'eth_accounts'});
       if(!accounts?.length) throw new Error('No accounts returned from wallet');
       const connected=(accounts[0]||'').toLowerCase();
       const expected=(pendingLogin.address||'').toLowerCase();
