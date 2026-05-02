@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Avatar from '../ui/Avatar';
 import { shortAddress } from '../../lib/utils';
 import ProfilePic from '../ui/ProfilePic';
-export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onProfile,onSettings,onWallet,onWalletConnect,onLogout,wallet,isDemo,profile,onEditContact,onSearch,mobileOpen,onMobileClose}){
+export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onProfile,onSettings,onWallet,onLogout,wallet,isDemo,profile,onEditContact,onSearch,mobileOpen,onMobileClose}){
   const [q,setQ]=useState('');
   const filtered=contacts.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())||c.address.includes(q));
   return(
@@ -58,18 +58,6 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
             borderRadius:4,padding:'2px 6px',color:'var(--accent2)'}}>{wallet?wallet.network:isDemo?'demo':' - '}</span>
         </div>
       </div>
-      {/* WalletConnect button — connect external wallet for transactions */}
-      {onWalletConnect&&(
-        <button onClick={onWalletConnect}
-          style={{margin:'0 10px 6px',padding:'9px 12px',background:'#2563eb',border:'1px solid #3b82f6',
-            borderRadius:9,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',
-            display:'flex',alignItems:'center',justifyContent:'center',gap:8,transition:'opacity .15s',flexShrink:0}}
-          onMouseEnter={e=>e.currentTarget.style.opacity='0.85'}
-          onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-          <svg width="14" height="14" viewBox="0 0 40 25" fill="white"><path d="M8.19 4.78C14.72-1.59 25.28-1.59 31.81 4.78L32.6 5.55a.83.83 0 0 1 0 1.19l-2.85 2.77a.44.44 0 0 1-.61 0l-1.1-1.06c-4.5-4.35-11.78-4.35-16.28 0l-1.18 1.14a.44.44 0 0 1-.61 0L7.12 6.82a.83.83 0 0 1 0-1.19l1.07-0.85zm29.32 5.47 2.54 2.46a.83.83 0 0 1 0 1.19L27.42 25.4a.87.87 0 0 1-1.22 0L17.7 17.2a.22.22 0 0 0-.31 0l-8.5 8.21a.87.87 0 0 1-1.22 0L.08 13.9a.83.83 0 0 1 0-1.19l2.54-2.46a.87.87 0 0 1 1.22 0l8.5 8.21a.22.22 0 0 0 .31 0l8.5-8.21a.87.87 0 0 1 1.22 0l8.5 8.21a.22.22 0 0 0 .31 0l8.5-8.21a.87.87 0 0 1 1.22 0z"/></svg>
-          WalletConnect
-        </button>
-      )}
       {/* Search */}
       <div style={{margin:'4px 10px 0',display:'flex',alignItems:'center',gap:6,background:'var(--surface)',
         border:'1px solid var(--border)',borderRadius:8,padding:'0 10px',flexShrink:0}}>
