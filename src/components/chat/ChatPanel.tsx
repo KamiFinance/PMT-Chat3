@@ -186,16 +186,16 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
 
     if(isImage){
       // Compress image before relay: mobile photos can be 3-5MB+ which exceed Redis 1MB limit
-      // Resize to max 1200px and encode as JPEG at 0.75 quality — keeps quality high but stays small
+      // Resize to max 900px and encode as JPEG at 0.7 quality — ensures < 200KB base64 for Redis 1MB limit
       const img=new Image();
       img.onload=()=>{
-        const MAX=1200;
+        const MAX=900;
         let w=img.width, h=img.height;
         if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
         const canvas=document.createElement('canvas');
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        const b64Data=canvas.toDataURL('image/jpeg',0.75);
+        const b64Data=canvas.toDataURL('image/jpeg',0.7);
         sendWithB64(b64Data,'image/jpeg');
       };
       img.onerror=()=>{

@@ -250,9 +250,9 @@ export default function App() {
         const enrichedCtx = contacts.map((ct: any) => {
           try {
             const p = JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`) ?? 'null');
-            // Only keep https avatar URLs in backup — base64 avatars are too large
-          const av = ct.avatarUrl || p.avatarUrl || null;
-          return { ...ct, avatarUrl: (av?.startsWith?.('http') ? av : null), bio: ct.bio || p.bio || '' };
+            if (!p) return ct;
+            const av = ct.avatarUrl || p.avatarUrl || null;
+            return { ...ct, avatarUrl: (av?.startsWith?.('http') ? av : null), bio: ct.bio || p.bio || '' };
           } catch { return ct; }
         });
         await saveCloudBackup(username, password, {
@@ -651,8 +651,14 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
     const uname = wallet.username.toLowerCase();
     fetch(`/api/auth?username=${encodeURIComponent(uname)}`)
       .then(r => r.json())
-      .then(data => {
-        if (!data.encryptedBackup) setShowBackupPrompt(true);
+      .then(() => {
+        // Show backup prompt once per 24h on session restore so auto-backup stays active
+        const promptKey = `pmt_backup_prompted_${wallet?.address?.toLowerCase()}`;
+        const lastPrompt = localStorage.getItem(promptKey);
+        if (!lastPrompt || Date.now() - parseInt(lastPrompt) > 86400000) {
+          localStorage.setItem(promptKey, String(Date.now()));
+          setShowBackupPrompt(true);
+        }
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -680,9 +686,9 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
         const enrichedCtx = contacts.map((ct: any) => {
           try {
             const p = JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`) ?? 'null');
-            // Only keep https avatar URLs in backup — base64 avatars are too large
-          const av = ct.avatarUrl || p.avatarUrl || null;
-          return { ...ct, avatarUrl: (av?.startsWith?.('http') ? av : null), bio: ct.bio || p.bio || '' };
+            if (!p) return ct;
+            const av = ct.avatarUrl || p.avatarUrl || null;
+            return { ...ct, avatarUrl: (av?.startsWith?.('http') ? av : null), bio: ct.bio || p.bio || '' };
           } catch { return ct; }
         });
         await saveCloudBackup(username, password, {
