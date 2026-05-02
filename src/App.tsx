@@ -261,8 +261,9 @@ export default function App() {
           messages: cleanMsgs,
           profile: profileRef.current ? {
             ...profileRef.current,
-            // Strip base64 avatars from backup — too large for Redis
+            // Strip full base64 avatarUrl (too large) but keep 40x40 thumbnail for relay
             avatarUrl: profileRef.current.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null,
+            _thumbUrl: (profileRef.current as any)._thumbUrl ?? null,
           } : {},
         });
       } catch { /* offline or Pinata unavailable — silent */ }
@@ -489,7 +490,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
           // If no IPFS CID, include the base64 audio directly so recipient can play it cross-device
           const audioB64 = (!vi.ipfsCid && vi.audioMsgId) ? (() => { try { return storage.getAudio(vi.audioMsgId!); } catch { return null; } })() : null;
           return { duration: vi.duration, waveform: vi.waveform, audioMsgId: vi.audioMsgId, ipfsCid: vi.ipfsCid, ipfsUrl: vi.ipfsUrl, ...(audioB64 ? { audioB64 } : {}) };
-        })()), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: (profileRef.current?.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null), fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
+        })()), ...((isImage || isFile) && { ipfsCid: (input as Message).ipfsCid ?? null, b64Data: (input as Message).b64Data ?? null, mediaMsgId: (input as Message).mediaMsgId, imgMsgId: (input as Message).imgMsgId, fileName: (input as Message).fileName, fileSize: (input as Message).fileSize, mimeType: (input as Message).mimeType }), from: w.address, fromName: profileRef.current?.name || w.username || w.address.slice(0, 8), fromAvatarUrl: (() => { const av = profileRef.current?.avatarUrl; return av?.startsWith('http') ? av : profileRef.current?._thumbUrl ?? null; })(), fromBio: profileRef.current?.bio ?? '', time: now(), block, hash: msg.hash, confirms: 0, ts: Date.now() };
         const existing: object[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.inbox(toAddr)) ?? '[]');
         localStorage.setItem(STORAGE_KEYS.inbox(toAddr), JSON.stringify([...existing, inboxMsg]));
         // Also deliver via cross-device API relay (fire-and-forget)
@@ -531,29 +532,27 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
   const saveProfile = useCallback((np: Profile) => {
     setProfile(np); profileRef.current = np;
     if (accountKey) storage.setProfile(accountKey, np);
-    // If avatar is base64, upload to Pinata in background → replace with IPFS URL
-    // so recipients can see it in relay messages (base64 is stripped from relay)
+    // Generate a 40x40 thumbnail for relay messages (tiny — ~2KB base64, safe for Redis)
     if (np.avatarUrl?.startsWith('data:')) {
-      const b64 = np.avatarUrl;
-      import('./lib/pinata').then(({ uploadToPinata, getIpfsUrl }) => {
-        // Convert base64 to File blob
-        const mime = b64.split(';')[0].split(':')[1] || 'image/jpeg';
-        const byteStr = atob(b64.split(',')[1]);
-        const bytes = new Uint8Array(byteStr.length);
-        for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
-        const blob = new Blob([bytes], { type: mime });
-        const file = new File([blob], 'avatar.jpg', { type: mime });
-        uploadToPinata(file, 'avatar_' + (wallet?.address?.slice(-8) ?? 'user') + '.jpg')
-          .then(cid => {
-            const ipfsUrl = getIpfsUrl(cid);
-            if (!ipfsUrl) return;
-            const updated: Profile = { ...np, avatarUrl: ipfsUrl };
-            setProfile(updated); profileRef.current = updated;
-            if (accountKey) storage.setProfile(accountKey, updated);
-          })
-          .catch(() => { /* Pinata unavailable — keep base64 locally */ });
-      }).catch(() => {});
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 40; canvas.height = 40;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        // Crop center square then resize
+        const s = Math.min(img.width, img.height);
+        const sx = (img.width - s) / 2;
+        const sy = (img.height - s) / 2;
+        ctx.drawImage(img, sx, sy, s, s, 0, 0, 40, 40);
+        const thumbUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const updated: Profile = { ...np, _thumbUrl: thumbUrl } as any;
+        profileRef.current = updated;
+        if (accountKey) storage.setProfile(accountKey, updated);
+      };
+      img.src = np.avatarUrl;
     }
+    // If avatar is a real URL (IPFS), no thumbnail needed — use URL directly
   }, [accountKey, wallet?.address]);
 
   const handleWalletConnect = async () => {
@@ -602,6 +601,13 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
   };
 
   const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any; sessionPassword?: string }) => {
+    // Write restored data to storage BEFORE setWallet so the accountKey useEffect
+    // finds them and doesn't overwrite with AI_AGENT_CONTACT only
+    if (w.address && (w.restoredContacts?.length || w.restoredMessages)) {
+      const ak = normalizeAddress(w.address);
+      if (w.restoredContacts?.length) storage.setContacts(ak, w.restoredContacts);
+      if (w.restoredMessages && Object.keys(w.restoredMessages).length) storage.setMsgs(ak, w.restoredMessages);
+    }
     setWallet(w);
     walletRef.current = w;
     // Keep password in memory for auto cloud backup (never stored to localStorage)
@@ -632,6 +638,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
     }
     if (w.restoredProfile) {
       setProfile(w.restoredProfile as Profile);
+      profileRef.current = w.restoredProfile as Profile;
       // Also save own profile to pmt_profile_{addr} for cross-component access
       if (w.address) {
         try {
@@ -697,8 +704,9 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
           messages: cleanMsgs,
           profile: profileRef.current ? {
             ...profileRef.current,
-            // Strip base64 avatars from backup — too large for Redis
+            // Strip full base64 avatarUrl (too large) but keep 40x40 thumbnail for relay
             avatarUrl: profileRef.current.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null,
+            _thumbUrl: (profileRef.current as any)._thumbUrl ?? null,
           } : {},
         });
       } catch { /* silent */ }
