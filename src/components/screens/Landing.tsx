@@ -165,7 +165,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         const address  = accounts[0];
         const chainId  = provider.chainId;
         const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
-        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia'};
+        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
         let balEth = '0.0000';
         try { const h = await provider.request({method:'eth_getBalance',params:[address,'latest']}); balEth=(parseInt(h,16)/1e18).toFixed(4); } catch {}
         onMetaMask({address, balance:balEth, network:netNames[chainHex]||('Chain '+chainId), chainId:chainHex, isMetaMask:true, walletName:'WalletConnect'});
@@ -200,7 +200,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         const address  = accounts[0];
         const chainId  = provider.chainId;
         const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
-        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia'};
+        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
         let balEth = '0.0000';
         try { const h = await provider.request({method:'eth_getBalance',params:[address,'latest']}); balEth=(parseInt(h,16)/1e18).toFixed(4); } catch {}
         onMetaMask({address, balance:balEth, network:netNames[chainHex]||('Chain '+chainId), chainId:chainHex, isMetaMask:true, walletName:'WalletConnect'});
