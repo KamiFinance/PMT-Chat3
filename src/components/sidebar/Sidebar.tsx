@@ -7,38 +7,39 @@ import ProfilePic from '../ui/ProfilePic';
 function SwitchNetworkButton() {
   const [status, setStatus] = React.useState('idle'); // idle | switching | done | error
   const [errMsg, setErrMsg] = React.useState('');
-  const eth = (window as any).ethereum;
 
-  const doSwitch = async () => {
+  const doSwitch = () => {
+    const eth = (window as any).ethereum;
+    if (!eth) return;
     setStatus('switching'); setErrMsg('');
-    try {
-      await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] });
+    // Fire the MetaMask request synchronously inside the click handler (no await before it)
+    const req = eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] });
+    req.then(() => {
       setStatus('done');
       setTimeout(() => setStatus('idle'), 3000);
-    } catch (e: any) {
+    }).catch((e: any) => {
       if (e.code === 4902 || e.code === -32603) {
         // Chain not added — add it
-        try {
-          await eth.request({
-            method: 'wallet_addEthereumChain',
-            params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
-              nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-              rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
-              blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
-          });
+        eth.request({
+          method: 'wallet_addEthereumChain',
+          params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
+            nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+            rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+            blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
+        }).then(() => {
           setStatus('done');
           setTimeout(() => setStatus('idle'), 3000);
-        } catch (e2: any) {
+        }).catch((e2: any) => {
           setStatus('error');
           setErrMsg(e2.code === 4001 ? 'Rejected' : e2.message?.slice(0,40) || 'Failed');
-        }
+        });
       } else if (e.code === 4001) {
-        setStatus('idle'); // user rejected — silent
+        setStatus('idle');
       } else {
         setStatus('error');
         setErrMsg(e.message?.slice(0,40) || 'Failed');
       }
-    }
+    });
   };
 
   const label = status === 'switching' ? 'Check MetaMask...'
