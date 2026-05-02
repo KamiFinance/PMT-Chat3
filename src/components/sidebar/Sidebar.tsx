@@ -10,6 +10,7 @@ import ProfilePic from '../ui/ProfilePic';
 function SwitchNetworkButton() {
   const [open, setOpen] = React.useState(false);
   const [copied, setCopied] = React.useState('');
+  const [switching, setSwitching] = React.useState(false);
   const [currentChain, setCurrentChain] = React.useState('');
 
   React.useEffect(() => {
@@ -20,6 +21,27 @@ function SwitchNetworkButton() {
     eth.on?.('chainChanged', onChange);
     return () => eth.removeListener?.('chainChanged', onChange);
   }, []);
+
+  const PMT_CHAIN = { chainId:'0x46df2', chainName:'PMChain',
+    nativeCurrency:{name:'PM',symbol:'PM',decimals:18},
+    rpcUrls:['https://node1-ipm.dweb3.wtf'],
+    blockExplorerUrls:['https://explorer.publicmasterpiece.com'] };
+
+  const handleClick = () => {
+    const eth = (window as any).ethereum;
+    if (!eth || open) { setOpen(v=>!v); return; }
+    // Try auto-switch first, fall back to manual panel
+    setSwitching(true);
+    eth.request({method:'wallet_switchEthereumChain', params:[{chainId:'0x46df2'}]})
+      .then(() => setSwitching(false))
+      .catch((e: any) => {
+        if (e.code === 4902 || e.code === -32603) {
+          eth.request({method:'wallet_addEthereumChain', params:[PMT_CHAIN]})
+            .then(() => setSwitching(false))
+            .catch(() => { setSwitching(false); setOpen(true); });
+        } else { setSwitching(false); setOpen(true); }
+      });
+  };
 
   const onPMT = currentChain === '0x46df2';
   const details = [
@@ -32,15 +54,16 @@ function SwitchNetworkButton() {
 
   return (
     <div style={{margin:'0 10px 6px',flexShrink:0}}>
-      <button onClick={()=>setOpen(v=>!v)}
+      <button onClick={handleClick}
         style={{width:'100%',padding:'9px 12px',
           background:onPMT?'rgba(74,222,128,.08)':'var(--surface)',
           border:`1px solid ${onPMT?'rgba(74,222,128,.3)':'var(--border)'}`,
           borderRadius:9,color:onPMT?'var(--accent3)':'var(--accent2)',
           fontSize:12,fontWeight:600,cursor:'pointer',
           display:'flex',alignItems:'center',justifyContent:'center',gap:7,
-          transition:'all .15s'}}>
-        {onPMT ? '✓ On PMChain' : '⛓ Add / Switch to PMChain'}
+          transition:'all .15s',opacity:switching?0.7:1}}>
+        {switching && <span style={{width:10,height:10,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'currentColor',borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>}
+        {onPMT ? '✓ On PMChain' : switching ? 'Switching...' : '⛓ Add / Switch to PMChain'}
       </button>
       {open && (
         <div style={{marginTop:6,background:'var(--surface)',border:'1px solid var(--border)',
