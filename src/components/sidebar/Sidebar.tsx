@@ -58,6 +58,37 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
             borderRadius:4,padding:'2px 6px',color:'var(--accent2)'}}>{wallet?wallet.network:isDemo?'demo':' - '}</span>
         </div>
       </div>
+      {/* Switch Network button — visible when MetaMask is present */}
+      {!isDemo && typeof window !== 'undefined' && (window as any).ethereum && (
+        <button onClick={async () => {
+          try {
+            await (window as any).ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x46c52' }],
+            });
+          } catch (e: any) {
+            if (e.code === 4902) {
+              await (window as any).ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
+                  nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+                  rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+                  blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
+              });
+            }
+          }
+        }}
+          style={{margin:'0 10px 6px',padding:'9px 12px',background:'var(--surface)',
+            border:'1px solid var(--border)',borderRadius:9,
+            color:'var(--accent2)',fontSize:12,fontWeight:600,cursor:'pointer',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:7,flexShrink:0,
+            transition:'border-color .15s'}}
+          onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent2)')}
+          onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
+          <span style={{fontSize:14}}>⛓</span>
+          Switch to PMT Chain
+        </button>
+      )}
       {/* Search */}
       <div style={{margin:'4px 10px 0',display:'flex',alignItems:'center',gap:6,background:'var(--surface)',
         border:'1px solid var(--border)',borderRadius:8,padding:'0 10px',flexShrink:0}}>
