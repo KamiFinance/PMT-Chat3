@@ -5,23 +5,7 @@ import Avatar from '../ui/Avatar';
 import { shortAddress } from '../../lib/utils';
 import ProfilePic from '../ui/ProfilePic';
 
-// Get the best available Ethereum provider via EIP-6963 or window.ethereum fallback
-async function getEthProvider(): Promise<any> {
-  return new Promise((resolve) => {
-    const providers: any[] = [];
-    const handler = (e: any) => providers.push(e.detail);
-    window.addEventListener('eip6963:announceProvider', handler);
-    window.dispatchEvent(new Event('eip6963:requestProvider'));
-    setTimeout(() => {
-      window.removeEventListener('eip6963:announceProvider', handler);
-      // Prefer MetaMask specifically
-      const mm = providers.find((p: any) => p.info?.rdns === 'io.metamask' || p.info?.name?.toLowerCase().includes('metamask'));
-      if (mm) resolve(mm.provider);
-      else if ((window as any).ethereum) resolve((window as any).ethereum);
-      else resolve(null);
-    }, 300);
-  });
-}
+
 
 function SwitchNetworkButton() {
   const [status, setStatus] = React.useState('idle'); // idle | switching | done | error
@@ -36,43 +20,34 @@ function SwitchNetworkButton() {
     return () => eth.removeListener?.('chainChanged', onChange);
   }, []);
 
+  const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMT Chain',
+    nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+    rpcUrls: ['https://node1-ipm.dweb3.wtf'],
+    blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
+
   const doSwitch = () => {
-    if (status === 'switching') { setStatus('idle'); return; } // second click cancels
+    if (status === 'switching') { setStatus('idle'); return; }
+    const eth = (window as any).ethereum;
+    if (!eth) { setStatus('error'); setErrMsg('No wallet extension found'); return; }
     setStatus('switching'); setErrMsg('');
-    getEthProvider().then(eth => {
-    if (!eth) { setStatus('error'); setErrMsg('No wallet found'); return; }
-    // Auto-reset after 30s if MetaMask doesn't respond
     const timeout = setTimeout(() => setStatus('idle'), 30000);
     const done = (ok: boolean, msg?: string) => {
       clearTimeout(timeout);
       if (ok) { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); }
       else { setStatus(msg ? 'error' : 'idle'); setErrMsg(msg || ''); }
     };
-    const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMT Chain',
-      nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-      rpcUrls: ['https://node1-ipm.dweb3.wtf'],
-      blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
     const addChain = () => eth.request({ method: 'wallet_addEthereumChain', params: [PMT_CHAIN] })
       .then(() => done(true))
       .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
     const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46df2' }] })
-      .then(() => {
-        // Verify the switch actually happened — some providers resolve without switching
-        eth.request({ method: 'eth_chainId' }).then((id: string) => {
-          if (id === '0x46df2') done(true);
-          else addChain(); // not on PMT Chain yet — add it
-        }).catch(() => done(true)); // can't verify, assume ok
-      })
-      .catch((e: any) => {
-        if (e.code === 4902 || e.code === -32603) addChain();
-        else done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed');
-      });
-    // Always request accounts first — wallet_switchEthereumChain silently
-    // succeeds without doing anything if the site has no active connection
+      .then(() => eth.request({ method: 'eth_chainId' })
+        .then((id: string) => id === '0x46df2' ? done(true) : addChain())
+        .catch(() => done(true)))
+      .catch((e: any) => e.code === 4902 || e.code === -32603 ? addChain()
+        : done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
     eth.request({ method: 'eth_requestAccounts' })
       .then(() => switchChain())
       .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || ''));
-    }); // getEthProvider
   };
 
   const onPMT = currentChain === '0x46df2';
