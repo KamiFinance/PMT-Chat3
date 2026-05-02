@@ -120,9 +120,19 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
     setErr(null);
     setConnecting(true);
     try {
+      // wallet_requestPermissions ALWAYS opens the wallet for the user to actively confirm
+      // (eth_accounts is silent; eth_requestAccounts skips if already connected)
       let accounts = [];
-      try { accounts = await provider.request({method:'eth_accounts'}); } catch {}
-      if (!accounts?.length) accounts = await provider.request({method:'eth_requestAccounts'});
+      try {
+        const perms = await provider.request({method:'wallet_requestPermissions', params:[{eth_accounts:{}}]});
+        const perm  = perms?.find(p => p.parentCapability === 'eth_accounts');
+        accounts    = perm?.caveats?.find(c => c.type === 'restrictReturnedAccounts')?.value || [];
+        if (!accounts.length) accounts = await provider.request({method:'eth_accounts'});
+      } catch(permErr) {
+        if (permErr.code === 4001) { setErr('Connection rejected.'); setConnecting(false); return; }
+        // Fallback for wallets that don't support wallet_requestPermissions
+        accounts = await provider.request({method:'eth_requestAccounts'});
+      }
       if (!accounts?.length) throw new Error('No accounts returned');
       const chainId  = await provider.request({method:'eth_chainId'});
       const balHex   = await provider.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
