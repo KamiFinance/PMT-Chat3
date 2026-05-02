@@ -4,6 +4,26 @@ import { PMTAuth } from '../../lib/auth';
 import { loadCloudBackup } from '../../lib/cloudBackup';
 import { getWCProvider, resetWCProvider } from '../../lib/walletconnect';
 const isMobile = () => /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+const WALLETS_LC = [
+  { id:'metamask', name:'MetaMask', scheme: u => `metamask://wc?uri=${encodeURIComponent(u)}` },
+  { id:'trust',    name:'Trust',    scheme: u => `trust://wc?uri=${encodeURIComponent(u)}` },
+  { id:'coinbase', name:'Coinbase', scheme: u => `cbwallet://wc?uri=${encodeURIComponent(u)}` },
+  { id:'rainbow',  name:'Rainbow',  scheme: u => `rainbow://wc?uri=${encodeURIComponent(u)}` },
+  { id:'phantom',  name:'Phantom',  scheme: u => `phantom://wc?uri=${encodeURIComponent(u)}` },
+  { id:'imtoken',  name:'imToken',  scheme: u => `imtokenv2://wc?uri=${encodeURIComponent(u)}` },
+  { id:'safepal',  name:'SafePal',  scheme: u => `safepalwallet://wc?uri=${encodeURIComponent(u)}` },
+  { id:'tangem',   name:'Tangem',   scheme: u => `tangem://wc?uri=${encodeURIComponent(u)}` },
+];
+const WICON_LC = {
+  metamask:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#F6851B"/><text y="28" x="20" text-anchor="middle" font-size="22">🦊</text></svg>`,
+  trust:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#3375BB"/><text y="28" x="20" text-anchor="middle" font-size="22">🛡️</text></svg>`,
+  coinbase:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0052FF"/><text y="28" x="20" text-anchor="middle" font-size="20" fill="white" font-weight="bold">C</text></svg>`,
+  rainbow:`<svg viewBox="0 0 40 40"><defs><linearGradient id="rblc" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF6B6B"/><stop offset=".5" stop-color="#FFBA08"/><stop offset="1" stop-color="#118AB2"/></linearGradient></defs><rect width="40" height="40" rx="12" fill="url(#rblc)"/><text y="28" x="20" text-anchor="middle" font-size="22">🌈</text></svg>`,
+  phantom:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#AB9FF2"/><text y="28" x="20" text-anchor="middle" font-size="22">👻</text></svg>`,
+  imtoken:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#11C4D1"/><text y="26" x="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">iToken</text></svg>`,
+  safepal:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#0F60FF"/><path d="M20 8L30 13L30 22C30 27.5 25.5 32 20 33.5C14.5 32 10 27.5 10 22L10 13Z" fill="none" stroke="white" stroke-width="2.5"/></svg>`,
+  tangem:`<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#1C1C1E"/><rect x="9" y="13" width="22" height="14" rx="3" fill="none" stroke="white" stroke-width="2"/><rect x="12" y="16" width="7" height="4" rx="1" fill="white"/><circle cx="26" cy="21" r="2" fill="#00D4AA"/></svg>`,
+};
 import QRCode from 'qrcode';
 
 
@@ -28,6 +48,8 @@ export default function LoginScreen({onLogin,onBack}){
   const [verifyErr,setVerifyErr]=useState(null);
   const [verifying,setVerifying]=useState(false);
   const [wcUri,setWcUri]=useState(null);
+  const [showWalletGrid,setShowWalletGrid]=useState(false);
+  const [waitApproval,setWaitApproval]=useState(false);
 
   // Check if there are saved accounts
   const savedAccounts=[];
@@ -142,17 +164,22 @@ export default function LoginScreen({onLogin,onBack}){
   },[verifyStep]);
 
   // WalletConnect verify — shows QR code then checks address on connect
-  const connectWCAndVerify=async()=>{
+  const connectWCAndVerify=async(schemeTemplate=null)=>{
     setVerifying(true);setVerifyErr(null);setWcUri(null);
     try{
       resetWCProvider();
       const provider=await getWCProvider();
-      const mob = isMobile();
+      // schemeTemplate: optional deep-link fn for mobile wallet grid
       provider.once('display_uri',(uri)=>{
-        if(mob){
+        if(schemeTemplate){
+          window.location.href=schemeTemplate(uri);
+          setWaitApproval(true); setVerifying(false);
+        } else if(isMobile()){
+          setShowWalletGrid(false);
           window.location.href=`https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`;
-        }else{
-          setWcUri(uri); setVerifying(false); // shows QR modal on desktop
+          setWaitApproval(true); setVerifying(false);
+        } else {
+          setWcUri(uri); setVerifying(false); // desktop QR
         }
       });
       provider.connect().then(async()=>{
@@ -169,10 +196,11 @@ Connected: ${connected.slice(0,8)}...${connected.slice(-6)}
 Switch to the correct account.`);
           resetWCProvider();return;
         }
+        setWaitApproval(false);
         localStorage.setItem(`pmt_verify_${connected}`, String(Date.now()));
         onLogin(pendingLogin);
       }).catch(e=>{
-        setWcUri(null);setVerifying(false);resetWCProvider();
+        setWcUri(null);setVerifying(false);setWaitApproval(false);resetWCProvider();
         const msg=e.message||String(e);
         if(!msg.includes('reset')&&!msg.includes('closed')&&!msg.includes('User rejected')){
           setVerifyErr('WalletConnect: '+msg);
@@ -221,7 +249,7 @@ Switch to the correct account.`);
                   :<>🔐 Connect with {w.name}</>}
               </button>
             ))
-          : <button onClick={connectWCAndVerify} disabled={verifying}
+          : <button onClick={()=>isMobile()?setShowWalletGrid(true):connectWCAndVerify()} disabled={verifying}
               style={{padding:'13px',background:'var(--accent)',border:'none',borderRadius:10,
                 color:'#0a0c14',fontWeight:600,fontSize:14,cursor:'pointer',
                 display:'flex',alignItems:'center',justifyContent:'center',gap:8,
@@ -229,9 +257,34 @@ Switch to the correct account.`);
               {verifying
                 ?<><span style={{width:14,height:14,border:'2px solid rgba(0,0,0,.3)',borderTopColor:'#0a0c14',
                     borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>Connecting...</>
-                :<>🔐 Open Wallet App to Verify</>}
+                :isMobile()?<>🔐 Choose Wallet to Verify</>:<>🔐 Connect & Verify Wallet</>}
             </button>
         }
+        {showWalletGrid&&isMobile()&&(
+          <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Choose your wallet</div>
+            <p style={{fontSize:12,color:'var(--text2)',lineHeight:1.5,margin:'0 0 12px'}}>Tap your wallet — approve the connection, then come back here.</p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+              {WALLETS_LC.map(w=>(
+                <button key={w.id} onClick={()=>connectWCAndVerify(w.scheme)}
+                  style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,padding:'12px 6px',
+                    background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,
+                    cursor:'pointer',outline:'none',width:'100%',WebkitTapHighlightColor:'transparent'}}>
+                  <div style={{width:40,height:40,borderRadius:10,overflow:'hidden'}} dangerouslySetInnerHTML={{__html:WICON_LC[w.id]}}/>
+                  <span style={{fontSize:10,color:'var(--text2)',fontWeight:500,textAlign:'center'}}>{w.name}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={()=>setShowWalletGrid(false)} style={{width:'100%',marginTop:10,padding:'9px',background:'transparent',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12}}>Cancel</button>
+          </div>
+        )}
+        {waitApproval&&(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,padding:'8px 0'}}>
+            <div style={{width:36,height:36,borderRadius:'50%',border:'3px solid var(--accent)',borderTopColor:'transparent',animation:'spin .8s linear infinite'}}/>
+            <div style={{textAlign:'center',fontSize:13,color:'var(--text2)',lineHeight:1.5}}>Approve the connection in your wallet, then come back here.</div>
+            <button onClick={()=>{setWaitApproval(false);resetWCProvider();}} style={{padding:'8px 18px',background:'transparent',border:'1px solid var(--border)',borderRadius:8,color:'var(--muted)',fontSize:12,cursor:'pointer'}}>← Cancel</button>
+          </div>
+        )}
         <button onClick={connectWCAndVerify} disabled={verifying}
           style={{padding:'11px',background:'#2563eb',border:'1px solid #3b82f6',borderRadius:9,
             color:'#fff',fontWeight:600,fontSize:13,cursor:'pointer',
