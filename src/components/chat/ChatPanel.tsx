@@ -166,7 +166,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
     const sendWithB64=(b64Data,mimeType=file.type)=>{
       onSend({
         type:msgType,
-        fileUrl:localUrl,
+        fileUrl:b64Data,   // sender sees the compressed image immediately
         b64Data,
         mediaMsgId:msgId,
         imgMsgId:msgId,
@@ -196,7 +196,6 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
         const b64Data=canvas.toDataURL('image/jpeg',0.75);
-        URL.revokeObjectURL(img.src);
         sendWithB64(b64Data,'image/jpeg');
       };
       img.onerror=()=>{
