@@ -39,14 +39,14 @@ function SwitchNetworkButton() {
       if (ok) { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); }
       else { setStatus(msg ? 'error' : 'idle'); setErrMsg(msg || ''); }
     };
-    const PMT_CHAIN = { chainId: '0x46c52', chainName: 'PMT Chain',
+    const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMT Chain',
       nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-      rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+      rpcUrls: ['https://node1-ipm.dweb3.wtf'],
       blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
     const addChain = () => eth.request({ method: 'wallet_addEthereumChain', params: [PMT_CHAIN] })
       .then(() => done(true))
       .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
-    const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] })
+    const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46df2' }] })
       .then(() => done(true))
       .catch((e: any) => {
         if (e.code === 4902 || e.code === -32603) addChain();

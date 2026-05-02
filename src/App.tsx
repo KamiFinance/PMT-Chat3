@@ -400,14 +400,14 @@ export default function App() {
         const fromAddr = accounts?.[0] ?? walletRef.current.address;
         // Switch to PMT Chain
         try {
-          await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] });
+          await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46df2' }] });
         } catch (switchErr: any) {
           if (switchErr.code === 4902 || switchErr.code === -32603) {
             await eth.request({
               method: 'wallet_addEthereumChain',
-              params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
+              params: [{ chainId: '0x46df2', chainName: 'PMT Chain',
                 nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-                rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+                rpcUrls: ['https://node1-ipm.dweb3.wtf'],
                 blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
             });
           } else if (switchErr.code !== 4001) throw switchErr;
@@ -461,9 +461,9 @@ You can answer ANY question: crypto, blockchain, coding, math, science, history,
 ## About PMT Chain & Publicmasterpiece Token (PMT)
 
 **PMT Chain** is a custom EVM-compatible blockchain built for the PMT-Chat ecosystem.
-- Chain ID: 0x46c52 (288594 decimal)
+- Chain ID: 0x46df2 (290290 decimal)
 - Native token: PMT (Publicmasterpiece Token)
-- RPC: wss://pmt-chain-node.publicmasterpiece.com (WebSocket) / https://pmt-chain-node.publicmasterpiece.com (HTTP)
+- RPC: wss://node1-ipm.dweb3.wtf (WebSocket) / https://node1-ipm.dweb3.wtf (HTTP)
 - Block explorer: https://explorer.publicmasterpiece.com
 - Consensus: Proof of Authority (PoA) — fast finality, low fees
 - Block time: ~3 seconds
@@ -490,8 +490,8 @@ You can answer ANY question: crypto, blockchain, coding, math, science, history,
 
 **How to add PMT Chain to MetaMask:**
 - Network name: PMT Chain
-- RPC URL: https://pmt-chain-node.publicmasterpiece.com
-- Chain ID: 288594
+- RPC URL: https://node1-ipm.dweb3.wtf
+- Chain ID: 290290
 - Currency symbol: PMT
 - Block explorer: https://explorer.publicmasterpiece.com
 
@@ -608,7 +608,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
           const chainId = await (window.ethereum as any).request({method:'eth_chainId'});
           const balHex = await (window.ethereum as any).request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
           const balEth = (parseInt(balHex,16)/1e18).toFixed(4);
-          const netNames: Record<string,string> = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
+          const netNames: Record<string,string> = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
           setWallet(prev => prev ? {...prev, connectedAddress: accounts[0], connectedNetwork: netNames[chainId]||('Chain '+parseInt(chainId,16)), connectedBalance: balEth} : prev);
           setWcErr(null);
           setWcConnecting(false);

@@ -137,7 +137,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       const chainId  = await provider.request({method:'eth_chainId'});
       const balHex   = await provider.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
       const balEth   = (parseInt(balHex, 16) / 1e18).toFixed(4);
-      const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
+      const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
       onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName});
     } catch(e) {
       if (e.code === 4001) setErr('Connection rejected.');
