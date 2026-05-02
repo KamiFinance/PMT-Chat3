@@ -21,6 +21,7 @@ function playNotifSound() {
 }
 import { uploadToPinata, getIpfsUrl } from './lib/pinata';
 import { saveCloudBackup } from './lib/cloudBackup';
+
 import { getWCProvider, resetWCProvider } from './lib/walletconnect';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
@@ -371,14 +372,32 @@ export default function App() {
     setMsgs(p => ({ ...p, [addr]: [...(p[addr] ?? []), tx] }));
     setContacts(p => p.map(c => c.id === contact.id ? { ...c, preview: `◈ Sent ${amount} PMT` } : c));
 
-    if (!isDemo && walletRef.current?.address && window.ethereum) {
+    if (!isDemo && walletRef.current?.address) {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
+        const eth = (window as any).ethereum;
+        if (!eth) throw new Error('No wallet found. Please install MetaMask to send PMT.');
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
-        const txHash = await (window.ethereum as any).request({
+        // Connect (shows MetaMask popup if not already connected)
+        const accounts = await eth.request({ method: 'eth_requestAccounts' });
+        const fromAddr = accounts?.[0] ?? walletRef.current.address;
+        // Use wallet_addEthereumChain directly — overwrites any wrong saved entry
+        // (e.g. MetaMask saved chain ID 290290 as "BNB Chain")
+        try {
+          await eth.request({
+            method: 'wallet_addEthereumChain',
+            params: [{ chainId: '0x46df2', chainName: 'PMChain',
+              nativeCurrency: { name: 'PM', symbol: 'PM', decimals: 18 },
+              rpcUrls: ['https://node1-ipm.dweb3.wtf'],
+              blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
+          });
+        } catch (addErr: any) {
+          if (addErr.code === 4001) throw addErr; // user rejected
+        }
+        const txHash = await eth.request({
           method: 'eth_sendTransaction',
-          params: [{ from: walletRef.current.address, to: addr, value: weiHex }],
+          params: [{ from: fromAddr, to: addr, value: weiHex }],
         }) as string;
         setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).map(m => m.id === txId ? { ...m, hash: txHash, pending: false, confirms: 1 } : m) }));
         return txHash;
@@ -425,16 +444,16 @@ You can answer ANY question: crypto, blockchain, coding, math, science, history,
 ## About PMT Chain & Publicmasterpiece Token (PMT)
 
 **PMT Chain** is a custom EVM-compatible blockchain built for the PMT-Chat ecosystem.
-- Chain ID: 0x46c52 (290290 decimal)
+- Chain ID: 0x46df2 (290290 decimal)
 - Native token: PMT (Publicmasterpiece Token)
-- RPC: wss://pmt-chain-node.publicmasterpiece.com (WebSocket) / https://pmt-chain-node.publicmasterpiece.com (HTTP)
+- RPC: wss://node1-ipm.dweb3.wtf (WebSocket) / https://node1-ipm.dweb3.wtf (HTTP)
 - Block explorer: https://explorer.publicmasterpiece.com
 - Consensus: Proof of Authority (PoA) — fast finality, low fees
 - Block time: ~3 seconds
 - Gas fees: extremely low (fractions of PMT)
 
 **PMT Token (Publicmasterpiece Token)**
-- The native currency of PMT Chain
+- The native currency of PMChain
 - Used to pay gas fees for all on-chain transactions
 - Sent peer-to-peer directly inside PMT-Chat conversations
 - Every message sent on PMT-Chat is recorded on-chain as a transaction
@@ -442,7 +461,7 @@ You can answer ANY question: crypto, blockchain, coding, math, science, history,
 - Wallet addresses are standard Ethereum-format (0x...)
 
 **PMT-Chat features:**
-- End-to-end encrypted messages stored on PMT Chain
+- End-to-end encrypted messages stored on PMChain
 - Send PMT tokens directly in chat (↑PMT button)
 - Username/password accounts with cloud backup (encrypted, zero-knowledge)
 - Cross-device sync via relay
@@ -452,14 +471,14 @@ You can answer ANY question: crypto, blockchain, coding, math, science, history,
 - WalletConnect + MetaMask support
 - AI assistant (you!) powered by Claude
 
-**How to add PMT Chain to MetaMask:**
-- Network name: PMT Chain
-- RPC URL: https://pmt-chain-node.publicmasterpiece.com
+**How to add PMChain to MetaMask:**
+- Network name: PMChain
+- RPC URL: https://node1-ipm.dweb3.wtf
 - Chain ID: 290290
 - Currency symbol: PMT
 - Block explorer: https://explorer.publicmasterpiece.com
 
-Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`, messages: [...history, { role: 'user', content: userMsg }] }),
+Answer questions about PMT, PMChain, the app, or anything else the user asks.`, messages: [...history, { role: 'user', content: userMsg }] }),
         })
         .then(r => r.json())
         .then(data => {

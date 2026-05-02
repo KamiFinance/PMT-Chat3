@@ -4,6 +4,129 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Avatar from '../ui/Avatar';
 import { shortAddress } from '../../lib/utils';
 import ProfilePic from '../ui/ProfilePic';
+
+
+
+function SwitchNetworkButton() {
+  const [open, setOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState('');
+  const [currentChain, setCurrentChain] = React.useState('');
+  const [switching, setSwitching] = React.useState(false);
+
+  React.useEffect(() => {
+    const eth = (window as any).ethereum;
+    if (!eth) return;
+    eth.request({method:'eth_chainId'}).then((id: string) => setCurrentChain(id)).catch(()=>{});
+    const onChange = (id: string) => setCurrentChain(id);
+    eth.on?.('chainChanged', onChange);
+    return () => eth.removeListener?.('chainChanged', onChange);
+  }, []);
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(''), 2000); });
+  };
+
+  const tryAutoSwitch = () => {
+    setSwitching(true);
+    // Try each discovered EIP-6963 provider
+    const providers: any[] = [];
+    const h = (e: any) => providers.push(e.detail);
+    window.addEventListener('eip6963:announceProvider', h);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    setTimeout(() => {
+      window.removeEventListener('eip6963:announceProvider', h);
+      const mm = providers.find((p: any) => p.info?.rdns === 'io.metamask');
+      const eth = mm?.provider || (window as any).ethereum;
+      if (!eth) { setSwitching(false); setOpen(true); return; }
+      const PMT = { chainId:'0x46df2', chainName:'PMChain',
+        nativeCurrency:{name:'PM',symbol:'PM',decimals:18},
+        rpcUrls:['https://node1-ipm.dweb3.wtf'],
+        blockExplorerUrls:['https://explorer.publicmasterpiece.com'] };
+      eth.request({method:'eth_requestAccounts'})
+        .then(() => eth.request({method:'wallet_addEthereumChain', params:[PMT]}))
+        .then(() => setSwitching(false))
+        .catch(() => { setSwitching(false); setOpen(true); });
+    }, 400);
+  };
+
+  const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMChain',
+    nativeCurrency: { name: 'PM', symbol: 'PM', decimals: 18 },
+    rpcUrls: ['https://node1-ipm.dweb3.wtf'],
+    blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
+
+  const doSwitch = () => {
+    if (status === 'switching') { setStatus('idle'); return; }
+    const eth = (window as any).ethereum;
+    if (!eth) { setStatus('error'); setErrMsg('No wallet extension found'); return; }
+    setStatus('switching'); setErrMsg('');
+    const timeout = setTimeout(() => setStatus('idle'), 30000);
+    const done = (ok: boolean, msg?: string) => {
+      clearTimeout(timeout);
+      if (ok) { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); }
+      else { setStatus(msg ? 'error' : 'idle'); setErrMsg(msg || ''); }
+    };
+    const addChain = () => eth.request({ method: 'wallet_addEthereumChain', params: [PMT_CHAIN] })
+      .then(() => done(true))
+      .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
+    // Use wallet_addEthereumChain directly — skipping wallet_switchEthereumChain
+    // because MetaMask may have a wrong saved entry with chain ID 290290 (e.g. "BNB Chain").
+    // wallet_addEthereumChain always prompts the user and overwrites the saved entry correctly.
+    eth.request({ method: 'eth_requestAccounts' })
+      .then(() => addChain())
+      .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || ''));
+  };
+
+  const onPMT = currentChain === '0x46df2';
+  const details = [
+    {label:'Network Name', value:'PMChain'},
+    {label:'RPC URL', value:'https://node1-ipm.dweb3.wtf'},
+    {label:'Chain ID', value:'290290'},
+    {label:'Currency Symbol', value:'PM'},
+    {label:'Block Explorer', value:'https://explorer.publicmasterpiece.com'},
+  ];
+  return (
+    <div style={{margin:'0 10px 6px',flexShrink:0}}>
+      <button onClick={onPMT ? undefined : tryAutoSwitch}
+        style={{width:'100%',padding:'9px 12px',
+          background:onPMT?'rgba(74,222,128,.08)':'var(--surface)',
+          border:`1px solid ${onPMT?'rgba(74,222,128,.3)':'var(--border)'}`,
+          borderRadius:9,color:onPMT?'var(--accent3)':'var(--accent2)',
+          fontSize:12,fontWeight:600,cursor:onPMT?'default':'pointer',
+          display:'flex',alignItems:'center',justifyContent:'center',gap:7,
+          transition:'all .15s',opacity:switching?0.7:1}}>
+        {switching && <span style={{width:10,height:10,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'var(--accent2)',borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>}
+        {onPMT ? '✓ On PMChain' : switching ? '⏳ Check MetaMask...' : '⛓ Switch to PMChain'}
+      </button>
+      {!onPMT && (
+        <button onClick={()=>setOpen((v: boolean)=>!v)}
+          style={{width:'100%',marginTop:4,padding:'6px',background:'transparent',
+            border:'none',color:'var(--muted)',fontSize:11,cursor:'pointer',textAlign:'center'}}>
+          {open ? 'Hide manual setup' : '+ Add PMChain manually'}
+        </button>
+      )}
+      {open && !onPMT && (
+        <div style={{marginTop:4,background:'var(--surface)',border:'1px solid var(--border)',
+          borderRadius:9,padding:'10px 12px',display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontSize:11,color:'var(--text2)',marginBottom:2}}>MetaMask → Add Network → Add manually:</div>
+          {details.map(({label,value}: {label:string,value:string})=>(
+            <div key={label} style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:10,color:'var(--muted)',width:88,flexShrink:0}}>{label}</span>
+              <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{value}</span>
+              <button onClick={()=>{navigator.clipboard.writeText(value);setCopied(label);setTimeout(()=>setCopied(''),2000);}}
+                style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:4,
+                  padding:'2px 6px',fontSize:10,color:copied===label?'var(--accent3)':'var(--muted)',
+                  cursor:'pointer',flexShrink:0}}>
+                {copied===label?'✓':'Copy'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onProfile,onSettings,onWallet,onLogout,wallet,isDemo,profile,onEditContact,onSearch,mobileOpen,onMobileClose}){
   const [q,setQ]=useState('');
   const filtered=contacts.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())||c.address.includes(q));
@@ -16,7 +139,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
           {profile?.avatarUrl
             ? <ProfilePic avatarUrl={profile.avatarUrl} initials={profile?.name?profile.name.slice(0,2).toUpperCase():'ME'}
                 color='var(--accent)' bg='#0a1f2a' size={34} fs={11}/>
-            : <img src={'/pmt-logo.png'} style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt="PMT"/>
+            : <img src={'/pmt-logo.png'} style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt="PM"/>
           }
         </div>
         <div style={{flex:1,minWidth:0}}>
@@ -53,11 +176,15 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
         </div>
         <div style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--accent)'}}>{wallet?wallet.address.slice(0,6)+'...'+wallet.address.slice(-4):isDemo?'Demo Wallet':'Not connected'}</div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:5}}>
-          <span style={{fontSize:12,color:'var(--accent3)',fontWeight:500}}>◈ {wallet?wallet.balance:isDemo?'2.847':'0.000'} PMT</span>
+          <span style={{fontSize:12,color:'var(--accent3)',fontWeight:500}}>◈ {wallet?wallet.balance:isDemo?'2.847':'0.000'} PM</span>
           <span style={{fontFamily:'var(--mono)',fontSize:9,background:'rgba(167,139,250,.15)',border:'1px solid rgba(167,139,250,.3)',
             borderRadius:4,padding:'2px 6px',color:'var(--accent2)'}}>{wallet?wallet.network:isDemo?'demo':' - '}</span>
         </div>
       </div>
+      {/* Switch Network button — visible when MetaMask is present */}
+      {!isDemo && typeof window !== 'undefined' && (window as any).ethereum && (
+        <SwitchNetworkButton/>
+      )}
       {/* Search */}
       <div style={{margin:'4px 10px 0',display:'flex',alignItems:'center',gap:6,background:'var(--surface)',
         border:'1px solid var(--border)',borderRadius:8,padding:'0 10px',flexShrink:0}}>
