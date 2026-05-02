@@ -3,6 +3,8 @@ import React, { useState, useRef } from 'react';
 import { getWCProvider, resetWCProvider } from '../../lib/walletconnect';
 import QRCode from 'qrcode';
 
+const isMobile = () => /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+
 function WCQRCanvas({ uri }) {
   const ref = useRef(null);
   React.useEffect(() => {
@@ -58,10 +60,18 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
 
   const connectWC = async () => {
     setVerifying(true); setErr(null); setWcUri(null);
+    const mob = isMobile();
     try {
       resetWCProvider();
       const provider = await getWCProvider();
-      provider.once('display_uri', (uri) => { setWcUri(uri); setVerifying(false); });
+      provider.once('display_uri', (uri) => {
+        if (mob) {
+          // Mobile: open wallet app via deep link (can't scan own screen)
+          window.location.href = `https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`;
+        } else {
+          setWcUri(uri); setVerifying(false);
+        }
+      });
       provider.connect().then(() => {
         setWcUri(null);
         const accounts = provider.accounts || [];

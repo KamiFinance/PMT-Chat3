@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PMTAuth } from '../../lib/auth';
 import { loadCloudBackup } from '../../lib/cloudBackup';
 import { getWCProvider, resetWCProvider } from '../../lib/walletconnect';
+const isMobile = () => /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
 import QRCode from 'qrcode';
 
 
@@ -146,9 +147,13 @@ export default function LoginScreen({onLogin,onBack}){
     try{
       resetWCProvider();
       const provider=await getWCProvider();
+      const mob = isMobile();
       provider.once('display_uri',(uri)=>{
-        setWcUri(uri);   // shows QR modal
-        setVerifying(false);
+        if(mob){
+          window.location.href=`https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`;
+        }else{
+          setWcUri(uri); setVerifying(false); // shows QR modal on desktop
+        }
       });
       provider.connect().then(async()=>{
         setWcUri(null);
