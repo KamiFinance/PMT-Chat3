@@ -372,32 +372,14 @@ export default function App() {
     setMsgs(p => ({ ...p, [addr]: [...(p[addr] ?? []), tx] }));
     setContacts(p => p.map(c => c.id === contact.id ? { ...c, preview: `◈ Sent ${amount} PMT` } : c));
 
-    if (!isDemo && walletRef.current?.address) {
+    if (!isDemo && walletRef.current?.address && window.ethereum) {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
-        const eth = (window as any).ethereum;
-        if (!eth) throw new Error('No wallet found. Please install MetaMask to send PMT.');
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
-        // Connect (shows MetaMask popup if not already connected)
-        const accounts = await eth.request({ method: 'eth_requestAccounts' });
-        const fromAddr = accounts?.[0] ?? walletRef.current.address;
-        // Use wallet_addEthereumChain directly — overwrites any wrong saved entry
-        // (e.g. MetaMask saved chain ID 290290 as "BNB Chain")
-        try {
-          await eth.request({
-            method: 'wallet_addEthereumChain',
-            params: [{ chainId: '0x46df2', chainName: 'PMChain',
-              nativeCurrency: { name: 'PM', symbol: 'PM', decimals: 18 },
-              rpcUrls: ['https://node1-ipm.dweb3.wtf'],
-              blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
-          });
-        } catch (addErr: any) {
-          if (addErr.code === 4001) throw addErr; // user rejected
-        }
-        const txHash = await eth.request({
+        const txHash = await (window.ethereum as any).request({
           method: 'eth_sendTransaction',
-          params: [{ from: fromAddr, to: addr, value: weiHex }],
+          params: [{ from: walletRef.current.address, to: addr, value: weiHex }],
         }) as string;
         setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).map(m => m.id === txId ? { ...m, hash: txHash, pending: false, confirms: 1 } : m) }));
         return txHash;
