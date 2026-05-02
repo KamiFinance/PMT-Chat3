@@ -375,10 +375,14 @@ export default function App() {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
+        // Ensure MetaMask is connected and shows the account picker
+        // eth_requestAccounts opens MetaMask if not yet connected
+        const accounts = await (window.ethereum as any).request({ method: 'eth_requestAccounts' });
+        const fromAddr = accounts?.[0] ?? walletRef.current.address;
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
         const txHash = await (window.ethereum as any).request({
           method: 'eth_sendTransaction',
-          params: [{ from: walletRef.current.address, to: addr, value: weiHex }],
+          params: [{ from: fromAddr, to: addr, value: weiHex }],
         }) as string;
         setMsgs(p => ({ ...p, [addr]: (p[addr] ?? []).map(m => m.id === txId ? { ...m, hash: txHash, pending: false, confirms: 1 } : m) }));
         return txHash;
