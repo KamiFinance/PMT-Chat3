@@ -295,8 +295,8 @@ export default function App() {
         Object.keys(stored).forEach(addr => {
           stored[addr] = (stored[addr] ?? []).map(m => {
             if ((m.mediaMsgId ?? m.imgMsgId) !== mediaMsgId) return m;
-            if (cid) return { ...m, ipfsCid: cid, fileUrl: null, uploading: false };
-            if (fallbackB64) return { ...m, b64Data: fallbackB64, fileUrl: null, uploading: false };
+            if (cid) return { ...m, ipfsCid: cid, fileUrl: ipfsUrl ?? getIpfsUrl(cid), uploading: false };
+            if (fallbackB64) return { ...m, b64Data: fallbackB64, fileUrl: fallbackB64, uploading: false };
             return m;
           });
         });
