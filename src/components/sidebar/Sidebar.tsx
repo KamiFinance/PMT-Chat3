@@ -9,34 +9,40 @@ function SwitchNetworkButton() {
   const [errMsg, setErrMsg] = React.useState('');
 
   const doSwitch = () => {
+    if (status === 'switching') { setStatus('idle'); return; } // second click cancels
     const eth = (window as any).ethereum;
     if (!eth) return;
     setStatus('switching'); setErrMsg('');
+    // Auto-reset after 30s if MetaMask doesn't respond
+    const timeout = setTimeout(() => setStatus('idle'), 30000);
+    const done = (ok: boolean, msg?: string) => {
+      clearTimeout(timeout);
+      if (ok) { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); }
+      else { setStatus(msg ? 'error' : 'idle'); setErrMsg(msg || ''); }
+    };
     const PMT_CHAIN = { chainId: '0x46c52', chainName: 'PMT Chain',
       nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
       rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
       blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
     const addChain = () => eth.request({ method: 'wallet_addEthereumChain', params: [PMT_CHAIN] })
-      .then(() => { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); })
-      .catch((e: any) => { setStatus('error'); setErrMsg(e.code === 4001 ? 'Rejected' : e.message?.slice(0,50) || 'Failed'); });
+      .then(() => done(true))
+      .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
     const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] })
-      .then(() => { setStatus('done'); setTimeout(() => setStatus('idle'), 3000); })
+      .then(() => done(true))
       .catch((e: any) => {
         if (e.code === 4902 || e.code === -32603) addChain();
-        else if (e.code === 4001) setStatus('idle');
-        else { setStatus('error'); setErrMsg(e.message?.slice(0,50) || 'Failed'); }
+        else done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed');
       });
-    // Must connect first if no account selected
     if (!eth.selectedAddress) {
       eth.request({ method: 'eth_requestAccounts' })
         .then(() => switchChain())
-        .catch((e: any) => { setStatus('idle'); setErrMsg(e.code === 4001 ? '' : e.message?.slice(0,50) || ''); });
+        .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || ''));
     } else {
       switchChain();
     }
   };
 
-  const label = status === 'switching' ? 'Check MetaMask...'
+  const label = status === 'switching' ? '⏳ Check MetaMask... (click to cancel)'
     : status === 'done' ? '✓ Switched!'
     : status === 'error' ? `⚠ ${errMsg}`
     : '⛓ Switch to PMT Chain';
@@ -50,7 +56,7 @@ function SwitchNetworkButton() {
     : 'var(--accent2)';
 
   return (
-    <button onClick={doSwitch} disabled={status === 'switching'}
+    <button onClick={doSwitch}
       style={{margin:'0 10px 6px',padding:'9px 12px',background:bg,
         border:`1px solid ${status==='done'?'rgba(74,222,128,.3)':status==='error'?'rgba(248,113,113,.3)':'var(--border)'}`,
         borderRadius:9,color,fontSize:12,fontWeight:600,cursor:status==='switching'?'default':'pointer',
