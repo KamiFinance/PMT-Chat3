@@ -39,14 +39,11 @@ function SwitchNetworkButton() {
     const addChain = () => eth.request({ method: 'wallet_addEthereumChain', params: [PMT_CHAIN] })
       .then(() => done(true))
       .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
-    const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46df2' }] })
-      .then(() => eth.request({ method: 'eth_chainId' })
-        .then((id: string) => id === '0x46df2' ? done(true) : addChain())
-        .catch(() => done(true)))
-      .catch((e: any) => e.code === 4902 || e.code === -32603 ? addChain()
-        : done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
+    // Use wallet_addEthereumChain directly — skipping wallet_switchEthereumChain
+    // because MetaMask may have a wrong saved entry with chain ID 290290 (e.g. "BNB Chain").
+    // wallet_addEthereumChain always prompts the user and overwrites the saved entry correctly.
     eth.request({ method: 'eth_requestAccounts' })
-      .then(() => switchChain())
+      .then(() => addChain())
       .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || ''));
   };
 

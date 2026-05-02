@@ -382,19 +382,18 @@ export default function App() {
         // Connect (shows MetaMask popup if not already connected)
         const accounts = await eth.request({ method: 'eth_requestAccounts' });
         const fromAddr = accounts?.[0] ?? walletRef.current.address;
-        // Switch to PMT Chain
+        // Use wallet_addEthereumChain directly — overwrites any wrong saved entry
+        // (e.g. MetaMask saved chain ID 290290 as "BNB Chain")
         try {
-          await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46df2' }] });
-        } catch (switchErr: any) {
-          if (switchErr.code === 4902 || switchErr.code === -32603) {
-            await eth.request({
-              method: 'wallet_addEthereumChain',
-              params: [{ chainId: '0x46df2', chainName: 'PMT Chain',
-                nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-                rpcUrls: ['https://node1-ipm.dweb3.wtf'],
-                blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
-            });
-          } else if (switchErr.code !== 4001) throw switchErr;
+          await eth.request({
+            method: 'wallet_addEthereumChain',
+            params: [{ chainId: '0x46df2', chainName: 'PMT Chain',
+              nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+              rpcUrls: ['https://node1-ipm.dweb3.wtf'],
+              blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
+          });
+        } catch (addErr: any) {
+          if (addErr.code === 4001) throw addErr; // user rejected
         }
         const txHash = await eth.request({
           method: 'eth_sendTransaction',
