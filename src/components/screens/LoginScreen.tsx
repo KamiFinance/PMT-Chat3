@@ -94,32 +94,26 @@ export default function LoginScreen({onLogin,onBack}){
   const connectAndVerify=async(provider,walletName)=>{
     setVerifying(true);setVerifyErr(null);
     try{
-      // wallet_requestPermissions ALWAYS opens the wallet for the user to actively confirm.
-      // eth_accounts is silent (no popup). eth_requestAccounts skips if already connected.
+      // Get account silently first, prompt if needed
       let accounts=[];
-      try{
-        const perms=await provider.request({method:'wallet_requestPermissions',params:[{eth_accounts:{}}]});
-        const perm=perms?.find(p=>p.parentCapability==='eth_accounts');
-        accounts=perm?.caveats?.find(c=>c.type==='restrictReturnedAccounts')?.value||[];
-        // Some wallets return empty caveats — fall back to eth_accounts after permission granted
-        if(!accounts.length) accounts=await provider.request({method:'eth_accounts'});
-      }catch(permErr){
-        if(permErr.code===4001){setVerifyErr('Connection rejected — please approve in your wallet.');setVerifying(false);return;}
-        // Fallback for wallets that don't support wallet_requestPermissions
-        accounts=await provider.request({method:'eth_requestAccounts'});
-      }
+      try{ accounts=await provider.request({method:'eth_accounts'}); }catch{}
+      if(!accounts?.length) accounts=await provider.request({method:'eth_requestAccounts'});
       if(!accounts?.length) throw new Error('No accounts returned from wallet');
       const connected=(accounts[0]||'').toLowerCase();
       const expected=(pendingLogin.address||'').toLowerCase();
       if(connected!==expected){
-        setVerifyErr(`Wrong wallet connected.\nExpected:  ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}\n\nSwitch to the correct account in your wallet and try again.`);
+        setVerifyErr(`Wrong wallet.\nExpected:  ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}\n\nSwitch to the correct account.`);
         return;
       }
+      // personal_sign ALWAYS opens wallet — proves private key ownership
+      const msg=`PMT-Chat ownership verification\nAddress: ${connected}\nTime: ${Date.now()}`;
+      const hex='0x'+Array.from(new TextEncoder().encode(msg)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      await provider.request({method:'personal_sign',params:[hex,connected]});
       onLogin(pendingLogin);
     }catch(e){
-      if(e.code===4001) setVerifyErr('Connection rejected — please approve in your wallet.');
+      if(e.code===4001||e.code==='ACTION_REJECTED') setVerifyErr('Signature rejected — please approve in your wallet.');
       else if(e.code===-32002) setVerifyErr('Wallet has a pending request — open your wallet and approve it.');
-      else setVerifyErr('Connection failed: '+(e.message||String(e)));
+      else setVerifyErr('Verification failed: '+(e.message||String(e)));
     }finally{setVerifying(false);}
   };
 
