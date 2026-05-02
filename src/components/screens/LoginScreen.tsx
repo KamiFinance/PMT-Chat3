@@ -94,10 +94,7 @@ export default function LoginScreen({onLogin,onBack}){
   const connectAndVerify=async(provider,walletName)=>{
     setVerifying(true);setVerifyErr(null);
     try{
-      // Get account silently first, prompt if needed
-      let accounts=[];
-      try{ accounts=await provider.request({method:'eth_accounts'}); }catch{}
-      if(!accounts?.length) accounts=await provider.request({method:'eth_requestAccounts'});
+      const accounts=await provider.request({method:'eth_requestAccounts'});
       if(!accounts?.length) throw new Error('No accounts returned from wallet');
       const connected=(accounts[0]||'').toLowerCase();
       const expected=(pendingLogin.address||'').toLowerCase();
@@ -105,15 +102,13 @@ export default function LoginScreen({onLogin,onBack}){
         setVerifyErr(`Wrong wallet.\nExpected:  ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}\n\nSwitch to the correct account.`);
         return;
       }
-      // personal_sign ALWAYS opens wallet — proves private key ownership
-      const msg=`PMT-Chat ownership verification\nAddress: ${connected}\nTime: ${Date.now()}`;
-      const hex='0x'+Array.from(new TextEncoder().encode(msg)).map(b=>b.toString(16).padStart(2,'0')).join('');
-      await provider.request({method:'personal_sign',params:[hex,connected]});
+      // Store 24h verify token so refresh doesn't ask again
+      localStorage.setItem(`pmt_verify_${connected}`, String(Date.now()));
       onLogin(pendingLogin);
     }catch(e){
-      if(e.code===4001||e.code==='ACTION_REJECTED') setVerifyErr('Signature rejected — please approve in your wallet.');
+      if(e.code===4001) setVerifyErr('Connection rejected — please approve in your wallet.');
       else if(e.code===-32002) setVerifyErr('Wallet has a pending request — open your wallet and approve it.');
-      else setVerifyErr('Verification failed: '+(e.message||String(e)));
+      else setVerifyErr('Connection failed: '+(e.message||String(e)));
     }finally{setVerifying(false);}
   };
 
@@ -163,6 +158,7 @@ Connected: ${connected.slice(0,8)}...${connected.slice(-6)}
 Switch to the correct account.`);
           resetWCProvider();return;
         }
+        localStorage.setItem(`pmt_verify_${connected}`, String(Date.now()));
         onLogin(pendingLogin);
       }).catch(e=>{
         setWcUri(null);setVerifying(false);resetWCProvider();

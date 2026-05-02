@@ -90,7 +90,12 @@ export default function App() {
       const sess = localStorage.getItem('pmt_session');
       if (sess) {
         const { username, address } = JSON.parse(sess);
-        if (address && username) return 'verify'; // must re-confirm wallet on refresh
+        if (address && username) {
+          // Check if wallet was verified within the last 24 hours
+          const verifyTs = localStorage.getItem(`pmt_verify_${address.toLowerCase()}`);
+          const isValid  = verifyTs && (Date.now() - parseInt(verifyTs)) < 86400000; // 24h
+          return isValid ? 'chat' : 'verify';
+        }
         if (address) return 'chat'; // MetaMask/WalletConnect — no password verification needed
       }
     } catch { /* ignore */ }
@@ -664,7 +669,10 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
   if (screen === 'login') return <LoginScreen onLogin={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'verify') return <VerifyWalletScreen
     address={wallet?.address ?? ''}
-    onVerified={() => setScreen('chat')}
+    onVerified={() => {
+      if (wallet?.address) localStorage.setItem(`pmt_verify_${wallet.address.toLowerCase()}`, String(Date.now()));
+      setScreen('chat');
+    }}
     onLogout={() => { storage.clearSession(); setWallet(null); walletRef.current = null; setScreen('landing'); }}
   />;
   if (screen === 'metamask_setup' && wallet) return <SetupMetaMaskFlow wallet={wallet} onDone={(username) => { setWallet(w => w ? { ...w, username } : w); setScreen('chat'); }} onSkip={() => {

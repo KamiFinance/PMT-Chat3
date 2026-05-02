@@ -12,44 +12,35 @@ function WCQRCanvas({ uri }) {
   return <div style={{ background: '#fff', borderRadius: 12, padding: 10, display: 'inline-block' }}><canvas ref={ref} style={{ display: 'block' }} /></div>;
 }
 
-// Prove wallet ownership by requesting a personal_sign — always opens wallet, no silent bypass
-async function proveOwnership(provider, expectedAddress) {
-  // Step 1: get accounts (eth_requestAccounts shows popup if needed, silent if already connected)
-  let accounts = [];
-  try { accounts = await provider.request({ method: 'eth_accounts' }); } catch {}
-  if (!accounts?.length) accounts = await provider.request({ method: 'eth_requestAccounts' });
-  if (!accounts?.length) throw new Error('No accounts returned from wallet');
-
-  const connected = accounts[0].toLowerCase();
-  const expected  = expectedAddress.toLowerCase();
-
-  if (connected !== expected) {
-    throw Object.assign(new Error('WRONG_ADDRESS'), { connected, expected });
-  }
-
-  // Step 2: sign a message — ALWAYS opens wallet for user to approve
-  const msg = `PMT-Chat ownership verification\nAddress: ${connected}\nTime: ${Date.now()}`;
-  const hex = '0x' + Array.from(new TextEncoder().encode(msg)).map(b => b.toString(16).padStart(2,'0')).join('');
-  await provider.request({ method: 'personal_sign', params: [hex, connected] });
-  // If we get here, user approved the signature → ownership confirmed
-}
-
 export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
   const [err,       setErr]       = useState(null);
   const [verifying, setVerifying] = useState(false);
   const [wcUri,     setWcUri]     = useState(null);
 
+  const checkAddress = (accounts) => {
+    if (!accounts?.length) throw new Error('No accounts returned from wallet');
+    const connected = accounts[0].toLowerCase();
+    const expected  = address.toLowerCase();
+    if (connected !== expected) {
+      const e = new Error('WRONG_ADDRESS');
+      e.connected = connected; e.expected = expected;
+      throw e;
+    }
+    onVerified();
+  };
+
   const connectInjected = async () => {
     setVerifying(true); setErr(null);
     try {
       if (!window.ethereum) { setErr('No wallet found. Use WalletConnect below.'); return; }
-      await proveOwnership(window.ethereum, address);
-      onVerified();
+      // Always request accounts — opens wallet popup if not already connected
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      checkAddress(accounts);
     } catch (e) {
       if (e.message === 'WRONG_ADDRESS') {
-        setErr(`Wrong wallet.\nExpected:  ${e.expected.slice(0,8)}...${e.expected.slice(-6)}\nConnected: ${e.connected.slice(0,8)}...${e.connected.slice(-6)}\n\nSwitch to the correct account and try again.`);
-      } else if (e.code === 4001 || e.code === 'ACTION_REJECTED') {
-        setErr('Signature rejected — please approve in your wallet to verify ownership.');
+        setErr(`Wrong wallet.\nExpected:  ${e.expected.slice(0,8)}...${e.expected.slice(-6)}\nConnected: ${e.connected.slice(0,8)}...${e.connected.slice(-6)}\n\nSwitch to the correct account.`);
+      } else if (e.code === 4001) {
+        setErr('Connection rejected — please approve in your wallet.');
       } else if (e.code === -32002) {
         setErr('Wallet has a pending request — open your wallet and approve it.');
       } else {
@@ -64,17 +55,13 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
       resetWCProvider();
       const provider = await getWCProvider();
       provider.once('display_uri', (uri) => { setWcUri(uri); setVerifying(false); });
-      provider.connect().then(async () => {
+      provider.connect().then(() => {
         setWcUri(null);
-        try {
-          await proveOwnership(provider, address);
-          onVerified();
-        } catch (e) {
+        const accounts = provider.accounts || [];
+        try { checkAddress(accounts); } catch (e) {
           if (e.message === 'WRONG_ADDRESS') {
             setErr(`Wrong wallet.\nExpected: ${e.expected.slice(0,8)}...${e.expected.slice(-6)}\nConnected: ${e.connected.slice(0,8)}...${e.connected.slice(-6)}`);
-          } else {
-            setErr('Verification failed: ' + (e.message || String(e)));
-          }
+          } else { setErr(e.message); }
           resetWCProvider();
         }
       }).catch(e => {
@@ -94,10 +81,9 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
 
         <div style={{ fontSize: 18, fontWeight: 600 }}>Confirm your wallet</div>
         <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
-          Sign a message with your wallet to prove ownership. Your wallet will open for approval.
+          Connect your wallet to confirm ownership. You won't be asked again for 24 hours.
         </div>
 
-        {/* Expected wallet */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--mono)', letterSpacing: '1px', marginBottom: 4 }}>EXPECTED WALLET</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--accent)', wordBreak: 'break-all' }}>{address}</div>
@@ -110,8 +96,8 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
         <button onClick={connectInjected} disabled={verifying}
           style={{ padding: 13, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#0a0c14', fontWeight: 600, fontSize: 14, cursor: verifying ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: verifying ? 0.7 : 1 }}>
           {verifying
-            ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,.3)', borderTopColor: '#0a0c14', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} />Waiting for wallet...</>
-            : '🔐 Connect & Sign to Verify'}
+            ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,.3)', borderTopColor: '#0a0c14', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} />Connecting...</>
+            : '🔐 Connect & Verify Wallet'}
         </button>
 
         <button onClick={connectWC} disabled={verifying}
@@ -126,7 +112,6 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
         </button>
       </div>
 
-      {/* WC QR modal */}
       {wcUri && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 16 }} onClick={() => setWcUri(null)}>
           <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 18, padding: '24px 20px', width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 14 }} onClick={e => e.stopPropagation()}>
