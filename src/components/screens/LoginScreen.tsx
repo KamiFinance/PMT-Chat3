@@ -81,15 +81,25 @@ export default function LoginScreen({onLogin,onBack}){
   const connectAndVerify=async(provider,walletName)=>{
     setVerifying(true);setVerifyErr(null);
     try{
-      // Mirror Landing's connectWith — works with any injected wallet
+      // wallet_requestPermissions ALWAYS opens the wallet for the user to actively confirm.
+      // eth_accounts is silent (no popup). eth_requestAccounts skips if already connected.
       let accounts=[];
-      try{accounts=await provider.request({method:'eth_accounts'});}catch{}
-      if(!accounts?.length) accounts=await provider.request({method:'eth_requestAccounts'});
+      try{
+        const perms=await provider.request({method:'wallet_requestPermissions',params:[{eth_accounts:{}}]});
+        const perm=perms?.find(p=>p.parentCapability==='eth_accounts');
+        accounts=perm?.caveats?.find(c=>c.type==='restrictReturnedAccounts')?.value||[];
+        // Some wallets return empty caveats — fall back to eth_accounts after permission granted
+        if(!accounts.length) accounts=await provider.request({method:'eth_accounts'});
+      }catch(permErr){
+        if(permErr.code===4001){setVerifyErr('Connection rejected — please approve in your wallet.');setVerifying(false);return;}
+        // Fallback for wallets that don't support wallet_requestPermissions
+        accounts=await provider.request({method:'eth_requestAccounts'});
+      }
       if(!accounts?.length) throw new Error('No accounts returned from wallet');
       const connected=(accounts[0]||'').toLowerCase();
       const expected=(pendingLogin.address||'').toLowerCase();
       if(connected!==expected){
-        setVerifyErr(`Wrong wallet connected.\nExpected:  ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}`);
+        setVerifyErr(`Wrong wallet connected.\nExpected:  ${expected.slice(0,8)}...${expected.slice(-6)}\nConnected: ${connected.slice(0,8)}...${connected.slice(-6)}\n\nSwitch to the correct account in your wallet and try again.`);
         return;
       }
       onLogin(pendingLogin);
