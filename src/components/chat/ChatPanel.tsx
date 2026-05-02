@@ -161,12 +161,9 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
     const localUrl=URL.createObjectURL(file);
     const isImage=file.type.startsWith('image/');
     const msgType=isImage?'image':'file';
-    // Read as base64 first — this is the reliable delivery mechanism
-    const reader=new FileReader();
-    reader.onloadend=()=>{
-      const b64Data=reader.result; // data:<mime>;base64,<data>
-      const msgId='m'+Date.now();
-      // Send immediately with b64Data embedded — inbox delivery works right away
+    const msgId='m'+Date.now();
+
+    const sendWithB64=(b64Data,mimeType=file.type)=>{
       onSend({
         type:msgType,
         fileUrl:localUrl,
@@ -175,7 +172,7 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
         imgMsgId:msgId,
         fileName:file.name,
         fileSize:formatSize(file.size),
-        mimeType:file.type,
+        mimeType,
       });
       // Upload to Pinata in background — upgrades to IPFS CID when done
       uploadToPinata(file, file.name)
@@ -186,7 +183,35 @@ export default function ChatPanel({contact,messages,onSend,onSendETH,isDemo,myAd
           if(onMediaUploaded) onMediaUploaded(msgId, null, null, b64Data);
         });
     };
-    reader.readAsDataURL(file);
+
+    if(isImage){
+      // Compress image before relay: mobile photos can be 3-5MB+ which exceed Redis 1MB limit
+      // Resize to max 1200px and encode as JPEG at 0.75 quality — keeps quality high but stays small
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1200;
+        let w=img.width, h=img.height;
+        if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        const b64Data=canvas.toDataURL('image/jpeg',0.75);
+        URL.revokeObjectURL(img.src);
+        sendWithB64(b64Data,'image/jpeg');
+      };
+      img.onerror=()=>{
+        // Fallback: send original if canvas fails
+        const reader=new FileReader();
+        reader.onloadend=()=>sendWithB64(reader.result);
+        reader.readAsDataURL(file);
+      };
+      img.src=localUrl;
+    } else {
+      // Non-image files: send as-is
+      const reader=new FileReader();
+      reader.onloadend=()=>sendWithB64(reader.result);
+      reader.readAsDataURL(file);
+    }
     e.target.value='';
   };
   const key=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
