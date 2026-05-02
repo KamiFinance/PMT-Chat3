@@ -77,7 +77,7 @@ export default function LoginScreen({onLogin,onBack}){
         localStorage.setItem('pmt_session',JSON.stringify({username:account.username,address:account.address}));
         // Password verified — now require wallet ownership confirmation
         setPendingLogin({address:walletData.address,privateKey:walletData.privateKey,
-          balance:'0.0000',network:'PMT Chain',username:account.username,sessionPassword:password});
+          balance:'0.0000',network:'PMChain',username:account.username,sessionPassword:password});
         setVerifyStep(true);
       } else {
         // Cloud restore: account not on this device — try IPFS backup
@@ -98,7 +98,7 @@ export default function LoginScreen({onLogin,onBack}){
         localStorage.setItem('pmt_account_'+w.address.toLowerCase(), JSON.stringify(acctData));
         localStorage.setItem('pmt_session', JSON.stringify({username: username.trim().toLowerCase(), address: w.address}));
         setPendingLogin({ address: w.address, privateKey: w.privateKey ?? '', balance:'0.0000',
-          network:'PMT Chain', username: username.trim().toLowerCase(),
+          network:'PMChain', username: username.trim().toLowerCase(),
           sessionPassword: password,
           restoredContacts: contacts ?? [],
           restoredMessages: messages ?? {},

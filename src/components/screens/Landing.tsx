@@ -137,7 +137,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
       const chainId  = await provider.request({method:'eth_chainId'});
       const balHex   = await provider.request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
       const balEth   = (parseInt(balHex, 16) / 1e18).toFixed(4);
-      const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
+      const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMChain'};
       onMetaMask({address:accounts[0], balance:balEth, network:netNames[chainId]||('Chain '+parseInt(chainId,16)), chainId, isMetaMask:true, walletName});
     } catch(e) {
       if (e.code === 4001) setErr('Connection rejected.');
@@ -165,7 +165,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         const address  = accounts[0];
         const chainId  = provider.chainId;
         const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
-        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
+        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMChain'};
         let balEth = '0.0000';
         try { const h = await provider.request({method:'eth_getBalance',params:[address,'latest']}); balEth=(parseInt(h,16)/1e18).toFixed(4); } catch {}
         onMetaMask({address, balance:balEth, network:netNames[chainHex]||('Chain '+chainId), chainId:chainHex, isMetaMask:true, walletName:'WalletConnect'});
@@ -200,7 +200,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
         const address  = accounts[0];
         const chainId  = provider.chainId;
         const chainHex = chainId ? '0x' + chainId.toString(16) : '0x1';
-        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMT Chain'};
+        const netNames = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46df2':'PMChain'};
         let balEth = '0.0000';
         try { const h = await provider.request({method:'eth_getBalance',params:[address,'latest']}); balEth=(parseInt(h,16)/1e18).toFixed(4); } catch {}
         onMetaMask({address, balance:balEth, network:netNames[chainHex]||('Chain '+chainId), chainId:chainHex, isMetaMask:true, walletName:'WalletConnect'});
@@ -251,7 +251,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
 
         {/* Brand */}
         <div style={{display:'flex',alignItems:'center',gap:14}}>
-          <img src="/pmt-logo.png" style={{width:52,height:52,borderRadius:14,objectFit:'cover',flexShrink:0}} alt="PMT"/>
+          <img src="/pmt-logo.png" style={{width:52,height:52,borderRadius:14,objectFit:'cover',flexShrink:0}} alt="PM"/>
           <div>
             <div style={{fontSize:22,fontWeight:600}}>PMT-Chat</div>
             <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--accent)',letterSpacing:'1.5px',marginTop:2}}>DECENTRALIZED MESSENGER</div>
@@ -264,7 +264,7 @@ export default function Landing({onDemo,onMetaMask,onCreateWallet,onImportWallet
 
         {/* Feature grid */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          {[['+','E2E Encrypted','AES-256 + wallet keys'],['#','On-Chain','PMT Chain'],
+          {[['+','E2E Encrypted','AES-256 + wallet keys'],['#','On-Chain','PMChain'],
             ['*','Self-Custody','Wallet = identity'],['+','Send PMT','Crypto in-chat']].map(([i,t,s])=>(
             <div key={t} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'10px 12px',
               background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10}}>

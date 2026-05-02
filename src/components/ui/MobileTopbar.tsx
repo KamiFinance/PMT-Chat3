@@ -25,7 +25,7 @@ export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo
           <div style={{minWidth:0}}>
             <div style={{fontSize:14,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{contact.name}</div>
             <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--accent)',opacity:.8}}>
-              {contact.isGroup?`${contact.members?.length||0} members`:contact.online?'● online':'PMT Chain'}
+              {contact.isGroup?`${contact.members?.length||0} members`:contact.online?'● online':'PMChain'}
             </div>
           </div>
         </div>
@@ -42,7 +42,7 @@ export default function MobileTopbar({contact,onOpenSidebar,onBack,wallet,isDemo
           lineHeight:1,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
         ☰
       </button>
-      <img src={'/pmt-logo.png'} style={{width:30,height:30,borderRadius:8,objectFit:'cover'}} alt="PMT"/>
+      <img src={'/pmt-logo.png'} style={{width:30,height:30,borderRadius:8,objectFit:'cover'}} alt="PM"/>
       <div style={{flex:1}}>
         <div style={{fontSize:14,fontWeight:600}}>PMT-Chat</div>
         <div style={{fontFamily:'var(--mono)',fontSize:9,color:isDemo?'var(--muted)':'var(--accent)'}}>

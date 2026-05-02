@@ -38,8 +38,8 @@ function SwitchNetworkButton() {
       const mm = providers.find((p: any) => p.info?.rdns === 'io.metamask');
       const eth = mm?.provider || (window as any).ethereum;
       if (!eth) { setSwitching(false); setOpen(true); return; }
-      const PMT = { chainId:'0x46df2', chainName:'PMT Chain',
-        nativeCurrency:{name:'PMT',symbol:'PMT',decimals:18},
+      const PMT = { chainId:'0x46df2', chainName:'PMChain',
+        nativeCurrency:{name:'PM',symbol:'PM',decimals:18},
         rpcUrls:['https://node1-ipm.dweb3.wtf'],
         blockExplorerUrls:['https://explorer.publicmasterpiece.com'] };
       eth.request({method:'eth_requestAccounts'})
@@ -49,8 +49,8 @@ function SwitchNetworkButton() {
     }, 400);
   };
 
-  const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMT Chain',
-    nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+  const PMT_CHAIN = { chainId: '0x46df2', chainName: 'PMChain',
+    nativeCurrency: { name: 'PM', symbol: 'PM', decimals: 18 },
     rpcUrls: ['https://node1-ipm.dweb3.wtf'],
     blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] };
 
@@ -78,10 +78,10 @@ function SwitchNetworkButton() {
 
   const onPMT = currentChain === '0x46df2';
   const details = [
-    {label:'Network Name', value:'PMT Chain'},
+    {label:'Network Name', value:'PMChain'},
     {label:'RPC URL', value:'https://node1-ipm.dweb3.wtf'},
     {label:'Chain ID', value:'290290'},
-    {label:'Currency Symbol', value:'PMT'},
+    {label:'Currency Symbol', value:'PM'},
     {label:'Block Explorer', value:'https://explorer.publicmasterpiece.com'},
   ];
   return (
@@ -95,13 +95,13 @@ function SwitchNetworkButton() {
           display:'flex',alignItems:'center',justifyContent:'center',gap:7,
           transition:'all .15s',opacity:switching?0.7:1}}>
         {switching && <span style={{width:10,height:10,border:'2px solid rgba(255,255,255,.2)',borderTopColor:'var(--accent2)',borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>}
-        {onPMT ? '✓ On PMT Chain' : switching ? '⏳ Check MetaMask...' : '⛓ Switch to PMT Chain'}
+        {onPMT ? '✓ On PMChain' : switching ? '⏳ Check MetaMask...' : '⛓ Switch to PMChain'}
       </button>
       {!onPMT && (
         <button onClick={()=>setOpen((v: boolean)=>!v)}
           style={{width:'100%',marginTop:4,padding:'6px',background:'transparent',
             border:'none',color:'var(--muted)',fontSize:11,cursor:'pointer',textAlign:'center'}}>
-          {open ? 'Hide manual setup' : '+ Add PMT Chain manually'}
+          {open ? 'Hide manual setup' : '+ Add PMChain manually'}
         </button>
       )}
       {open && !onPMT && (
@@ -139,7 +139,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
           {profile?.avatarUrl
             ? <ProfilePic avatarUrl={profile.avatarUrl} initials={profile?.name?profile.name.slice(0,2).toUpperCase():'ME'}
                 color='var(--accent)' bg='#0a1f2a' size={34} fs={11}/>
-            : <img src={'/pmt-logo.png'} style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt="PMT"/>
+            : <img src={'/pmt-logo.png'} style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt="PM"/>
           }
         </div>
         <div style={{flex:1,minWidth:0}}>
@@ -176,7 +176,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
         </div>
         <div style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--accent)'}}>{wallet?wallet.address.slice(0,6)+'...'+wallet.address.slice(-4):isDemo?'Demo Wallet':'Not connected'}</div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:5}}>
-          <span style={{fontSize:12,color:'var(--accent3)',fontWeight:500}}>◈ {wallet?wallet.balance:isDemo?'2.847':'0.000'} PMT</span>
+          <span style={{fontSize:12,color:'var(--accent3)',fontWeight:500}}>◈ {wallet?wallet.balance:isDemo?'2.847':'0.000'} PM</span>
           <span style={{fontFamily:'var(--mono)',fontSize:9,background:'rgba(167,139,250,.15)',border:'1px solid rgba(167,139,250,.3)',
             borderRadius:4,padding:'2px 6px',color:'var(--accent2)'}}>{wallet?wallet.network:isDemo?'demo':' - '}</span>
         </div>
