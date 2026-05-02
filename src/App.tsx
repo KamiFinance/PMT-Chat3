@@ -21,6 +21,23 @@ function playNotifSound() {
 }
 import { uploadToPinata, getIpfsUrl } from './lib/pinata';
 import { saveCloudBackup } from './lib/cloudBackup';
+
+// Get specific MetaMask provider via EIP-6963 to avoid conflicts with other wallet extensions
+async function getEthProvider(): Promise<any> {
+  return new Promise((resolve) => {
+    const providers: any[] = [];
+    const handler = (e: any) => providers.push((e as any).detail);
+    window.addEventListener('eip6963:announceProvider', handler);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    setTimeout(() => {
+      window.removeEventListener('eip6963:announceProvider', handler);
+      const mm = providers.find((p: any) => p.info?.rdns === 'io.metamask' || p.info?.name?.toLowerCase().includes('metamask'));
+      if (mm) resolve(mm.provider);
+      else if ((window as any).ethereum) resolve((window as any).ethereum);
+      else resolve(null);
+    }, 300);
+  });
+}
 import { getWCProvider, resetWCProvider } from './lib/walletconnect';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
@@ -375,10 +392,10 @@ export default function App() {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
-        const eth = (window as any).ethereum;
-        if (!eth) throw new Error('No wallet found. Please install MetaMask or use WalletConnect to send PMT.');
+        const eth = await getEthProvider();
+        if (!eth) throw new Error('No wallet found. Please install MetaMask to send PMT.');
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
-        // Connect if needed
+        // Connect (shows MetaMask popup if not already connected)
         const accounts = await eth.request({ method: 'eth_requestAccounts' });
         const fromAddr = accounts?.[0] ?? walletRef.current.address;
         // Switch to PMT Chain

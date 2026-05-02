@@ -4,15 +4,34 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Avatar from '../ui/Avatar';
 import { shortAddress } from '../../lib/utils';
 import ProfilePic from '../ui/ProfilePic';
+
+// Get the best available Ethereum provider via EIP-6963 or window.ethereum fallback
+async function getEthProvider(): Promise<any> {
+  return new Promise((resolve) => {
+    const providers: any[] = [];
+    const handler = (e: any) => providers.push(e.detail);
+    window.addEventListener('eip6963:announceProvider', handler);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    setTimeout(() => {
+      window.removeEventListener('eip6963:announceProvider', handler);
+      // Prefer MetaMask specifically
+      const mm = providers.find((p: any) => p.info?.rdns === 'io.metamask' || p.info?.name?.toLowerCase().includes('metamask'));
+      if (mm) resolve(mm.provider);
+      else if ((window as any).ethereum) resolve((window as any).ethereum);
+      else resolve(null);
+    }, 300);
+  });
+}
+
 function SwitchNetworkButton() {
   const [status, setStatus] = React.useState('idle'); // idle | switching | done | error
   const [errMsg, setErrMsg] = React.useState('');
 
   const doSwitch = () => {
     if (status === 'switching') { setStatus('idle'); return; } // second click cancels
-    const eth = (window as any).ethereum;
-    if (!eth) return;
     setStatus('switching'); setErrMsg('');
+    getEthProvider().then(eth => {
+    if (!eth) { setStatus('error'); setErrMsg('No wallet found'); return; }
     // Auto-reset after 30s if MetaMask doesn't respond
     const timeout = setTimeout(() => setStatus('idle'), 30000);
     const done = (ok: boolean, msg?: string) => {
@@ -40,6 +59,7 @@ function SwitchNetworkButton() {
     } else {
       switchChain();
     }
+    }); // getEthProvider
   };
 
   const label = status === 'switching' ? '⏳ Check MetaMask... (click to cancel)'
