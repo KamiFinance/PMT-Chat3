@@ -4,6 +4,69 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Avatar from '../ui/Avatar';
 import { shortAddress } from '../../lib/utils';
 import ProfilePic from '../ui/ProfilePic';
+function SwitchNetworkButton() {
+  const [status, setStatus] = React.useState('idle'); // idle | switching | done | error
+  const [errMsg, setErrMsg] = React.useState('');
+  const eth = (window as any).ethereum;
+
+  const doSwitch = async () => {
+    setStatus('switching'); setErrMsg('');
+    try {
+      await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46c52' }] });
+      setStatus('done');
+      setTimeout(() => setStatus('idle'), 3000);
+    } catch (e: any) {
+      if (e.code === 4902 || e.code === -32603) {
+        // Chain not added — add it
+        try {
+          await eth.request({
+            method: 'wallet_addEthereumChain',
+            params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
+              nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+              rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+              blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
+          });
+          setStatus('done');
+          setTimeout(() => setStatus('idle'), 3000);
+        } catch (e2: any) {
+          setStatus('error');
+          setErrMsg(e2.code === 4001 ? 'Rejected' : e2.message?.slice(0,40) || 'Failed');
+        }
+      } else if (e.code === 4001) {
+        setStatus('idle'); // user rejected — silent
+      } else {
+        setStatus('error');
+        setErrMsg(e.message?.slice(0,40) || 'Failed');
+      }
+    }
+  };
+
+  const label = status === 'switching' ? 'Check MetaMask...'
+    : status === 'done' ? '✓ Switched!'
+    : status === 'error' ? `⚠ ${errMsg}`
+    : '⛓ Switch to PMT Chain';
+
+  const bg = status === 'done' ? 'rgba(74,222,128,.1)'
+    : status === 'error' ? 'rgba(248,113,113,.1)'
+    : 'var(--surface)';
+
+  const color = status === 'done' ? 'var(--accent3)'
+    : status === 'error' ? 'var(--danger)'
+    : 'var(--accent2)';
+
+  return (
+    <button onClick={doSwitch} disabled={status === 'switching'}
+      style={{margin:'0 10px 6px',padding:'9px 12px',background:bg,
+        border:`1px solid ${status==='done'?'rgba(74,222,128,.3)':status==='error'?'rgba(248,113,113,.3)':'var(--border)'}`,
+        borderRadius:9,color,fontSize:12,fontWeight:600,cursor:status==='switching'?'default':'pointer',
+        display:'flex',alignItems:'center',justifyContent:'center',gap:7,flexShrink:0,
+        transition:'all .15s',opacity:status==='switching'?0.7:1}}>
+      {status === 'switching' && <span style={{width:10,height:10,border:'2px solid rgba(255,255,255,.2)',borderTopColor:color,borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>}
+      {label}
+    </button>
+  );
+}
+
 export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onProfile,onSettings,onWallet,onLogout,wallet,isDemo,profile,onEditContact,onSearch,mobileOpen,onMobileClose}){
   const [q,setQ]=useState('');
   const filtered=contacts.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())||c.address.includes(q));
@@ -60,34 +123,7 @@ export default function Sidebar({contacts,activeId,onSelect,onNew,onNewGroup,onP
       </div>
       {/* Switch Network button — visible when MetaMask is present */}
       {!isDemo && typeof window !== 'undefined' && (window as any).ethereum && (
-        <button onClick={async () => {
-          try {
-            await (window as any).ethereum.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x46c52' }],
-            });
-          } catch (e: any) {
-            if (e.code === 4902) {
-              await (window as any).ethereum.request({
-                method: 'wallet_addEthereumChain',
-                params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
-                  nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
-                  rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
-                  blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
-              });
-            }
-          }
-        }}
-          style={{margin:'0 10px 6px',padding:'9px 12px',background:'var(--surface)',
-            border:'1px solid var(--border)',borderRadius:9,
-            color:'var(--accent2)',fontSize:12,fontWeight:600,cursor:'pointer',
-            display:'flex',alignItems:'center',justifyContent:'center',gap:7,flexShrink:0,
-            transition:'border-color .15s'}}
-          onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent2)')}
-          onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
-          <span style={{fontSize:14}}>⛓</span>
-          Switch to PMT Chain
-        </button>
+        <SwitchNetworkButton/>
       )}
       {/* Search */}
       <div style={{margin:'4px 10px 0',display:'flex',alignItems:'center',gap:6,background:'var(--surface)',

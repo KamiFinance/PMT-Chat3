@@ -100,7 +100,7 @@ export default function SendModal({contact, onClose, onSend, isDemo}) {
           <button onClick={go} disabled={sending||!amount}
             style={{flex:2,padding:10,background:'var(--accent3)',border:'none',borderRadius:9,
               color:'#0a0c14',fontWeight:600,fontSize:13.5,cursor:sending?'default':'pointer',opacity:sending?0.7:1}}>
-            {sending ? 'Confirm in wallet...' : `Send ${amount||'0'} PMT`}
+            {sending ? '🦊 Check MetaMask popup...' : `Send ${amount||'0'} PMT`}
           </button>
         </div>
 
