@@ -62,6 +62,7 @@ import Landing from './components/screens/Landing';
 import CreateWalletFlow from './components/screens/CreateWalletFlow';
 import ImportWalletFlow from './components/screens/ImportWalletFlow';
 import LoginScreen from './components/screens/LoginScreen';
+import VerifyWalletScreen from './components/screens/VerifyWalletScreen';
 import SetupMetaMaskFlow from './components/screens/SetupMetaMaskFlow';
 import Sidebar from './components/sidebar/Sidebar';
 import ChatPanel from './components/chat/ChatPanel';
@@ -89,7 +90,8 @@ export default function App() {
       const sess = localStorage.getItem('pmt_session');
       if (sess) {
         const { username, address } = JSON.parse(sess);
-        if (address && username) return 'chat';
+        if (address && username) return 'verify'; // must re-confirm wallet on refresh
+        if (address) return 'chat'; // MetaMask/WalletConnect — no password verification needed
       }
     } catch { /* ignore */ }
     return 'landing';
@@ -660,6 +662,11 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
   if (screen === 'create') return <CreateWalletFlow onWallet={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'import') return <ImportWalletFlow onWallet={handleWallet} onBack={() => setScreen('landing')} />;
   if (screen === 'login') return <LoginScreen onLogin={handleWallet} onBack={() => setScreen('landing')} />;
+  if (screen === 'verify') return <VerifyWalletScreen
+    address={wallet?.address ?? ''}
+    onVerified={() => setScreen('chat')}
+    onLogout={() => { storage.clearSession(); setWallet(null); walletRef.current = null; setScreen('landing'); }}
+  />;
   if (screen === 'metamask_setup' && wallet) return <SetupMetaMaskFlow wallet={wallet} onDone={(username) => { setWallet(w => w ? { ...w, username } : w); setScreen('chat'); }} onSkip={() => {
                 // Save minimal account so returning users skip setup next time
                 try {

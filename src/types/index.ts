@@ -137,7 +137,8 @@ export type Screen =
   | 'import'
   | 'login'
   | 'chat'
-  | 'metamask_setup';
+  | 'metamask_setup'
+  | 'verify';
 
 export interface MsgsMap {
   [address: string]: Message[];
