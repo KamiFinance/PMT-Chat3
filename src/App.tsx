@@ -375,10 +375,27 @@ export default function App() {
       try {
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
           throw new Error('Invalid address. Please edit the contact and add their full 0x wallet address.');
-        // Ensure MetaMask is connected and shows the account picker
-        // eth_requestAccounts opens MetaMask if not yet connected
+        // Ensure MetaMask is connected
         const accounts = await (window.ethereum as any).request({ method: 'eth_requestAccounts' });
         const fromAddr = accounts?.[0] ?? walletRef.current.address;
+        // Switch to PMT Chain (0x46c52 = 288594) — MetaMask will prompt if not already on it
+        try {
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x46c52' }],
+          });
+        } catch (switchErr: any) {
+          // Chain not added yet — add it
+          if (switchErr.code === 4902) {
+            await (window.ethereum as any).request({
+              method: 'wallet_addEthereumChain',
+              params: [{ chainId: '0x46c52', chainName: 'PMT Chain',
+                nativeCurrency: { name: 'PMT', symbol: 'PMT', decimals: 18 },
+                rpcUrls: ['https://pmt-chain-node.publicmasterpiece.com'],
+                blockExplorerUrls: ['https://explorer.publicmasterpiece.com'] }],
+            });
+          } else throw switchErr;
+        }
         const weiHex = '0x' + BigInt(Math.floor(parseFloat(amount) * 1e18)).toString(16);
         const txHash = await (window.ethereum as any).request({
           method: 'eth_sendTransaction',
