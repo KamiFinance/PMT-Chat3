@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PMTAuth } from '../../lib/auth';
 import { loadCloudBackup } from '../../lib/cloudBackup';
+import { getWCProvider, resetWCProvider } from '../../lib/walletconnect';
 
 
 export default function LoginScreen({onLogin,onBack}){
@@ -132,6 +133,37 @@ export default function LoginScreen({onLogin,onBack}){
     return()=>window.removeEventListener('eip6963:announceProvider',onAnnounce);
   },[verifyStep]);
 
+  // WalletConnect verify — opens WC QR modal then checks address
+  const connectWCAndVerify=async()=>{
+    setVerifying(true);setVerifyErr(null);
+    try{
+      resetWCProvider();
+      const provider=await getWCProvider();
+      let wcUri=null;
+      provider.once('display_uri',(uri)=>{ wcUri=uri; });
+      // Fire connect in background, open QR via window.open so it doesn't block
+      provider.connect().then(async()=>{
+        const accounts=provider.accounts||[];
+        if(!accounts.length){setVerifyErr('No accounts found.');resetWCProvider();setVerifying(false);return;}
+        const connected=accounts[0].toLowerCase();
+        const expected=(pendingLogin.address||'').toLowerCase();
+        if(connected!==expected){
+          setVerifyErr(`Wrong wallet. Expected: ${expected.slice(0,8)}...${expected.slice(-6)} Connected: ${connected.slice(0,8)}...${connected.slice(-6)}`); resetWCProvider();setVerifying(false);return;
+        }
+        onLogin(pendingLogin);
+      }).catch(e=>{
+        resetWCProvider();setVerifying(false);
+        if(!e.message?.includes('reset')&&!e.message?.includes('closed')) setVerifyErr('WalletConnect: '+(e.message||String(e)));
+      });
+      // Wait briefly for display_uri then open in new window
+      await new Promise(res=>setTimeout(res,800));
+      if(wcUri) window.open('https://metamask.app.link/wc?uri='+encodeURIComponent(wcUri),'_blank');
+    }catch(e){
+      setVerifying(false);resetWCProvider();
+      setVerifyErr('WalletConnect: '+(e.message||String(e)));
+    }
+  };
+
   // Wallet verification step
   if(verifyStep&&pendingLogin) return(
     <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',
@@ -173,6 +205,14 @@ export default function LoginScreen({onLogin,onBack}){
               Waiting for wallet... Make sure MetaMask or another wallet is installed.
             </div>
         }
+        <button onClick={connectWCAndVerify} disabled={verifying}
+          style={{padding:'11px',background:'#2563eb',border:'1px solid #3b82f6',borderRadius:9,
+            color:'#fff',fontWeight:600,fontSize:13,cursor:'pointer',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+            opacity:verifying?0.7:1}}>
+          <svg width="14" height="9" viewBox="0 0 40 25" fill="white"><path d="M8.19 4.78C14.72-1.59 25.28-1.59 31.81 4.78L32.6 5.55a.83.83 0 0 1 0 1.19l-2.85 2.77a.44.44 0 0 1-.61 0l-1.1-1.06c-4.5-4.35-11.78-4.35-16.28 0l-1.18 1.14a.44.44 0 0 1-.61 0L7.12 6.82a.83.83 0 0 1 0-1.19l1.07-.85zm29.32 5.47 2.54 2.46a.83.83 0 0 1 0 1.19L27.42 25.4a.87.87 0 0 1-1.22 0L17.7 17.2a.22.22 0 0 0-.31 0l-8.5 8.21a.87.87 0 0 1-1.22 0L.08 13.9a.83.83 0 0 1 0-1.19l2.54-2.46a.87.87 0 0 1 1.22 0l8.5 8.21a.22.22 0 0 0 .31 0l8.5-8.21a.87.87 0 0 1 1.22 0l8.5 8.21a.22.22 0 0 0 .31 0l8.5-8.21a.87.87 0 0 1 1.22 0z"/></svg>
+          Verify with WalletConnect
+        </button>
         <button onClick={()=>{setVerifyStep(false);setPendingLogin(null);setVerifyErr(null);}}
           style={{padding:'10px',background:'transparent',border:'1px solid var(--border)',
             borderRadius:9,color:'var(--muted)',cursor:'pointer',fontSize:13}}>

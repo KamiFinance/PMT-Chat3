@@ -12,7 +12,7 @@ export const AI_MODEL = 'claude-sonnet-4-5';
 // WalletConnect v2 project ID
 // Get yours free at https://cloud.walletconnect.com
 export const WC_PROJECT_ID: string =
-  (import.meta as any).env?.VITE_WC_PROJECT_ID ?? '3fbb6bba6f1de962d911bb5b5c3dba68';
+  (import.meta as any).env?.VITE_WC_PROJECT_ID ?? 'c2dba76201be08a0906f59f4d416129b';
 
 export const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',

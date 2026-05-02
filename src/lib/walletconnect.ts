@@ -8,7 +8,7 @@ export async function getWCProvider() {
   // Allow runtime override (set by Landing.tsx when user pastes their project ID)
   const runtimeId = (window as any).__WC_PROJECT_ID_OVERRIDE;
   const effectiveId = runtimeId || WC_PROJECT_ID;
-  if (!effectiveId || effectiveId.length < 20 || effectiveId === '3fbb6bba6f1de962d911bb5b5c3dba68') {
+  if (!effectiveId || effectiveId.length < 20) {
     throw new Error('WalletConnect Project ID not configured.');
   }
   const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
