@@ -531,7 +531,30 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
   const saveProfile = useCallback((np: Profile) => {
     setProfile(np); profileRef.current = np;
     if (accountKey) storage.setProfile(accountKey, np);
-  }, [accountKey]);
+    // If avatar is base64, upload to Pinata in background → replace with IPFS URL
+    // so recipients can see it in relay messages (base64 is stripped from relay)
+    if (np.avatarUrl?.startsWith('data:')) {
+      const b64 = np.avatarUrl;
+      import('./lib/pinata').then(({ uploadToPinata, getIpfsUrl }) => {
+        // Convert base64 to File blob
+        const mime = b64.split(';')[0].split(':')[1] || 'image/jpeg';
+        const byteStr = atob(b64.split(',')[1]);
+        const bytes = new Uint8Array(byteStr.length);
+        for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mime });
+        const file = new File([blob], 'avatar.jpg', { type: mime });
+        uploadToPinata(file, 'avatar_' + (wallet?.address?.slice(-8) ?? 'user') + '.jpg')
+          .then(cid => {
+            const ipfsUrl = getIpfsUrl(cid);
+            if (!ipfsUrl) return;
+            const updated: Profile = { ...np, avatarUrl: ipfsUrl };
+            setProfile(updated); profileRef.current = updated;
+            if (accountKey) storage.setProfile(accountKey, updated);
+          })
+          .catch(() => { /* Pinata unavailable — keep base64 locally */ });
+      }).catch(() => {});
+    }
+  }, [accountKey, wallet?.address]);
 
   const handleWalletConnect = async () => {
     setWcErr(null);
