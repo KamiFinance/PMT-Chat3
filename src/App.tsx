@@ -21,6 +21,7 @@ function playNotifSound() {
 }
 import { uploadToPinata, getIpfsUrl } from './lib/pinata';
 import { saveCloudBackup } from './lib/cloudBackup';
+import { getWCProvider, resetWCProvider } from './lib/walletconnect';
 import { hashMessage, broadcastMessage } from './lib/pmtchain';
 import { useInboxPoll } from './hooks/useInboxPoll';
 import { AI_AGENT_ADDRESS, AI_AGENT_CONTACT } from './constants/ai';
@@ -132,6 +133,8 @@ export default function App() {
 
   const [showProfile, setShowProfile] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
+  const [wcConnecting, setWcConnecting] = useState(false);
+  const [wcErr, setWcErr] = useState<string|null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
@@ -510,6 +513,51 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
     if (accountKey) storage.setProfile(accountKey, np);
   }, [accountKey]);
 
+  const handleWalletConnect = async () => {
+    setWcErr(null);
+    setWcConnecting(true);
+    try {
+      // Try injected wallet first (MetaMask, Trust, etc.)
+      if (window.ethereum) {
+        const perms = await (window.ethereum as any).request({method:'wallet_requestPermissions', params:[{eth_accounts:{}}]}).catch(() => null);
+        let accounts: string[] = [];
+        if (perms) {
+          const perm = perms?.find((p: any) => p.parentCapability === 'eth_accounts');
+          accounts = perm?.caveats?.find((cv: any) => cv.type === 'restrictReturnedAccounts')?.value || [];
+        }
+        if (!accounts.length) accounts = await (window.ethereum as any).request({method:'eth_requestAccounts'});
+        if (accounts.length) {
+          const chainId = await (window.ethereum as any).request({method:'eth_chainId'});
+          const balHex = await (window.ethereum as any).request({method:'eth_getBalance',params:[accounts[0],'latest']}).catch(()=>'0x0');
+          const balEth = (parseInt(balHex,16)/1e18).toFixed(4);
+          const netNames: Record<string,string> = {'0x1':'Ethereum','0x89':'Polygon','0xa':'Optimism','0xa4b1':'Arbitrum','0xaa36a7':'Sepolia','0x46c52':'PMT Chain'};
+          setWallet(prev => prev ? {...prev, connectedAddress: accounts[0], connectedNetwork: netNames[chainId]||('Chain '+parseInt(chainId,16)), connectedBalance: balEth} : prev);
+          setWcErr(null);
+          setWcConnecting(false);
+          return;
+        }
+      }
+      // Fallback: WalletConnect QR
+      resetWCProvider();
+      const provider = await getWCProvider();
+      provider.once('display_uri', (uri: string) => {
+        // open WC URI in same tab on mobile, new window on desktop
+        if (/Mobi|Android/i.test(navigator.userAgent)) {
+          window.location.href = `metamask://wc?uri=${encodeURIComponent(uri)}`;
+        } else {
+          window.open(`https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`, '_blank');
+        }
+      });
+      await provider.connect();
+      const addr = provider.accounts?.[0];
+      if (addr) setWallet(prev => prev ? {...prev, connectedAddress: addr} : prev);
+    } catch(e: any) {
+      if (e?.code !== 4001) setWcErr(e?.message || 'WalletConnect failed');
+    } finally {
+      setWcConnecting(false);
+    }
+  };
+
   const handleWallet = useCallback((w: Wallet & { restoredContacts?: any[]; restoredMessages?: Record<string,any[]>; restoredProfile?: any; sessionPassword?: string }) => {
     setWallet(w);
     walletRef.current = w;
@@ -629,7 +677,7 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
     <AppContext.Provider value={{ wallet, profile, isDemo, darkMode, toggleTheme }}>
       <div className="app-grid">
         <div className={`sidebar-overlay${mobileSidebarOpen ? ' visible' : ''}`} onClick={() => setMobileSidebarOpen(false)} />
-        <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
+        <Sidebar contacts={contacts} activeId={active?.id ?? null} wallet={wallet} isDemo={isDemo} profile={profile} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onSelect={selectContact} onNew={() => setShowNew(true)} onNewGroup={() => setShowGroup(true)} onProfile={() => { setShowProfile(true); setMobileSidebarOpen(false); }} onSettings={() => { setShowSettings(true); setMobileSidebarOpen(false); }} onWallet={() => setShowWallet(true)} onWalletConnect={handleWalletConnect} onLogout={handleLogout} onEditContact={setEditContact} onSearch={() => setShowSearch(true)} />
         <main className="chat-panel">
           {(active && active.address) ? <ChatErrorBoundary onReset={() => setActiveAndRef(null)}><ChatPanel contact={active} messages={msgs[normalizeAddress(active.address)] ?? []} onSend={sendMsg} onSendETH={sendETH} isDemo={isDemo} myAddress={wallet?.address?.toLowerCase() ?? ''} onReact={(msgId: string, emoji: string) => handleReact(normalizeAddress(active.address), msgId, emoji)} onMediaUploaded={handleMediaUploaded} onOpenSidebar={() => setMobileSidebarOpen(true)} onBack={() => { setActiveAndRef(null); setMobileSidebarOpen(true); }} onViewContact={(c) => setEditContact(c)} /> </ChatErrorBoundary> : <Empty onNew={() => setShowNew(true)} onOpenSidebar={() => setMobileSidebarOpen(true)} />}
         </main>
