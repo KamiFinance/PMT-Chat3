@@ -47,7 +47,13 @@ function SwitchNetworkButton() {
       .then(() => done(true))
       .catch((e: any) => done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed'));
     const switchChain = () => eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x46df2' }] })
-      .then(() => done(true))
+      .then(() => {
+        // Verify the switch actually happened — some providers resolve without switching
+        eth.request({ method: 'eth_chainId' }).then((id: string) => {
+          if (id === '0x46df2') done(true);
+          else addChain(); // not on PMT Chain yet — add it
+        }).catch(() => done(true)); // can't verify, assume ok
+      })
       .catch((e: any) => {
         if (e.code === 4902 || e.code === -32603) addChain();
         else done(false, e.code === 4001 ? '' : e.message?.slice(0,50) || 'Failed');
