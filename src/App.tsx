@@ -246,9 +246,16 @@ export default function App() {
             return keep;
           });
         });
+        // Enrich contacts with pmt_profile_{addr} data so avatar/bio survive backup/restore
+        const enrichedCtx = contacts.map((ct: any) => {
+          try {
+            const p = JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`) ?? 'null');
+            return p ? { ...ct, avatarUrl: ct.avatarUrl || p.avatarUrl || null, bio: ct.bio || p.bio || '' } : ct;
+          } catch { return ct; }
+        });
         await saveCloudBackup(username, password, {
           wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
-          contacts,
+          contacts: enrichedCtx,
           messages: cleanMsgs,
           profile: profileRef.current ?? {},
         });
@@ -575,12 +582,34 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
       // Always ensure AI agent contact is present after restore
       const hasAI = w.restoredContacts.some((c: any) => c.isAI);
       setContacts(hasAI ? w.restoredContacts : [AI_AGENT_CONTACT, ...w.restoredContacts]);
+      // Restore pmt_profile_{addr} keys so contact avatars/bios are available immediately
+      w.restoredContacts.forEach((ct: any) => {
+        if (!ct.address || ct.isAI) return;
+        try {
+          const key = `pmt_profile_${ct.address.toLowerCase()}`;
+          const existing = JSON.parse(localStorage.getItem(key) ?? '{}');
+          localStorage.setItem(key, JSON.stringify({
+            ...existing,
+            ...(ct.avatarUrl ? { avatarUrl: ct.avatarUrl } : {}),
+            ...(ct.bio ? { bio: ct.bio } : {}),
+            ...(ct.name ? { name: ct.name } : {}),
+            address: ct.address.toLowerCase(),
+          }));
+        } catch { /* ignore */ }
+      });
     }
     if (w.restoredMessages && Object.keys(w.restoredMessages).length) {
       setMsgs(w.restoredMessages as MsgsMap);
     }
     if (w.restoredProfile) {
       setProfile(w.restoredProfile as Profile);
+      // Also save own profile to pmt_profile_{addr} for cross-component access
+      if (w.address) {
+        try {
+          localStorage.setItem(`pmt_profile_${w.address.toLowerCase()}`,
+            JSON.stringify({ ...w.restoredProfile, address: w.address.toLowerCase() }));
+        } catch { /* ignore */ }
+      }
     }
     setScreen('chat');
   }, [setContacts, setMsgs]);
@@ -618,9 +647,16 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
             return keep;
           });
         });
+        // Enrich contacts with pmt_profile_{addr} data so avatar/bio survive backup/restore
+        const enrichedCtx = contacts.map((ct: any) => {
+          try {
+            const p = JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`) ?? 'null');
+            return p ? { ...ct, avatarUrl: ct.avatarUrl || p.avatarUrl || null, bio: ct.bio || p.bio || '' } : ct;
+          } catch { return ct; }
+        });
         await saveCloudBackup(username, password, {
           wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
-          contacts,
+          contacts: enrichedCtx,
           messages: cleanMsgs,
           profile: profileRef.current ?? {},
         });
@@ -719,10 +755,11 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
                     Object.entries(msgs).forEach(([addr,arr])=>{
                       cleanMsgs[addr]=(arr as any[]).slice(addr===AI_AGENT_ADDRESS.toLowerCase()?-100:-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
                     });
+                    const enrichedC=contacts.map((ct:any)=>{try{const p=JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`)||'null');return p?{...ct,avatarUrl:ct.avatarUrl||p.avatarUrl||null,bio:ct.bio||p.bio||''}:ct;}catch{return ct;}});
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
                       wallet:{address:wallet?.address??'',privateKey:wallet?.privateKey??'',username:uname},
-                      contacts,messages:cleanMsgs,profile:profileRef.current??{}
+                      contacts:enrichedC,messages:cleanMsgs,profile:profileRef.current??{}
                     });
                     setShowBackupPrompt(false);setBackupPromptPassword('');
                   }catch(err:any){setBackupPromptErr(err.message||'Failed — check password');}
@@ -747,10 +784,11 @@ Answer questions about PMT, PMT Chain, the app, or anything else the user asks.`
                     Object.entries(msgs).forEach(([addr,arr])=>{
                       cleanMsgs[addr]=(arr as any[]).slice(addr===AI_AGENT_ADDRESS.toLowerCase()?-100:-50).map(m=>{const{b64Data,audioUrl,fileUrl,imgData,fileData,uploading,_toAddr,waveform,audioB64,...keep}=m;return keep;});
                     });
+                    const enrichedC=contacts.map((ct:any)=>{try{const p=JSON.parse(localStorage.getItem(`pmt_profile_${ct.address?.toLowerCase()}`)||'null');return p?{...ct,avatarUrl:ct.avatarUrl||p.avatarUrl||null,bio:ct.bio||p.bio||''}:ct;}catch{return ct;}});
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
                       wallet:{address:wallet?.address??'',privateKey:wallet?.privateKey??'',username:uname},
-                      contacts,messages:cleanMsgs,profile:profileRef.current??{}
+                      contacts:enrichedC,messages:cleanMsgs,profile:profileRef.current??{}
                     });
                     setShowBackupPrompt(false);setBackupPromptPassword('');
                   }catch(err:any){setBackupPromptErr(err.message||'Failed — check password');}
