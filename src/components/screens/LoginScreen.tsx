@@ -221,9 +221,16 @@ Switch to the correct account.`);
                   :<>🔐 Connect with {w.name}</>}
               </button>
             ))
-          : <div style={{fontSize:12,color:'var(--muted)',textAlign:'center',padding:'8px 0'}}>
-              Waiting for wallet... Make sure MetaMask or another wallet is installed.
-            </div>
+          : <button onClick={connectWCAndVerify} disabled={verifying}
+              style={{padding:'13px',background:'var(--accent)',border:'none',borderRadius:10,
+                color:'#0a0c14',fontWeight:600,fontSize:14,cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+                opacity:verifying?0.7:1}}>
+              {verifying
+                ?<><span style={{width:14,height:14,border:'2px solid rgba(0,0,0,.3)',borderTopColor:'#0a0c14',
+                    borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/>Connecting...</>
+                :<>🔐 Open Wallet App to Verify</>}
+            </button>
         }
         <button onClick={connectWCAndVerify} disabled={verifying}
           style={{padding:'11px',background:'#2563eb',border:'1px solid #3b82f6',borderRadius:9,

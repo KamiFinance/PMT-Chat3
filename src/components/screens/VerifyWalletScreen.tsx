@@ -34,7 +34,12 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
   const connectInjected = async () => {
     setVerifying(true); setErr(null);
     try {
-      if (!window.ethereum) { setErr('No wallet found. Use WalletConnect below.'); return; }
+      // On mobile without an injected wallet, go straight to WalletConnect
+      if (!window.ethereum) {
+        setVerifying(false);
+        connectWC();
+        return;
+      }
       // wallet_requestPermissions ALWAYS opens MetaMask even if already connected
       // Then eth_accounts retrieves the selected account
       try {
@@ -114,7 +119,7 @@ export default function VerifyWalletScreen({ address, onVerified, onLogout }) {
           style={{ padding: 13, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#0a0c14', fontWeight: 600, fontSize: 14, cursor: verifying ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: verifying ? 0.7 : 1 }}>
           {verifying
             ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,.3)', borderTopColor: '#0a0c14', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} />Connecting...</>
-            : '🔐 Connect & Verify Wallet'}
+            : window.ethereum ? '🔐 Connect & Verify Wallet' : '🔐 Open Wallet App to Verify'}
         </button>
 
         <button onClick={connectWC} disabled={verifying}
