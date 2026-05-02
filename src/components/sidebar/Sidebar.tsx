@@ -26,6 +26,15 @@ async function getEthProvider(): Promise<any> {
 function SwitchNetworkButton() {
   const [status, setStatus] = React.useState('idle'); // idle | switching | done | error
   const [errMsg, setErrMsg] = React.useState('');
+  const [currentChain, setCurrentChain] = React.useState('');
+  React.useEffect(() => {
+    const eth = (window as any).ethereum;
+    if (!eth) return;
+    eth.request({method:'eth_chainId'}).then((id: string) => setCurrentChain(id)).catch(()=>{});
+    const onChange = (id: string) => setCurrentChain(id);
+    eth.on?.('chainChanged', onChange);
+    return () => eth.removeListener?.('chainChanged', onChange);
+  }, []);
 
   const doSwitch = () => {
     if (status === 'switching') { setStatus('idle'); return; } // second click cancels
@@ -68,16 +77,17 @@ function SwitchNetworkButton() {
     }); // getEthProvider
   };
 
+  const onPMT = currentChain === '0x46df2';
   const label = status === 'switching' ? '⏳ Check MetaMask... (click to cancel)'
-    : status === 'done' ? '✓ Switched!'
     : status === 'error' ? `⚠ ${errMsg}`
+    : onPMT ? '✓ On PMT Chain'
     : '⛓ Switch to PMT Chain';
 
-  const bg = status === 'done' ? 'rgba(74,222,128,.1)'
+  const bg = onPMT ? 'rgba(74,222,128,.08)'
     : status === 'error' ? 'rgba(248,113,113,.1)'
     : 'var(--surface)';
 
-  const color = status === 'done' ? 'var(--accent3)'
+  const color = onPMT ? 'var(--accent3)'
     : status === 'error' ? 'var(--danger)'
     : 'var(--accent2)';
 
