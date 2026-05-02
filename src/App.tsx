@@ -260,12 +260,13 @@ export default function App() {
           wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
           contacts: enrichedCtx,
           messages: cleanMsgs,
-          profile: profileRef.current ? {
-            ...profileRef.current,
-            // Strip full base64 avatarUrl (too large) but keep 40x40 thumbnail for relay
-            avatarUrl: profileRef.current.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null,
-            _thumbUrl: (profileRef.current as any)._thumbUrl ?? null,
-          } : {},
+          profile: profileRef.current ? await (async () => {
+            const av = profileRef.current!.avatarUrl;
+            // Compress base64 avatar to 64x64 thumbnail (~3KB) for backup
+            const { compressAvatarForBackup } = await import('./lib/cloudBackup');
+            const compressed = av ? await compressAvatarForBackup(av) : null;
+            return { ...profileRef.current, avatarUrl: compressed };
+          })() : {},
         });
       } catch { /* offline or Pinata unavailable — silent */ }
     }, 8000);
@@ -721,12 +722,13 @@ Answer questions about PMT, PMChain, the app, or anything else the user asks.`, 
           wallet: { address: wallet.address, privateKey: wallet.privateKey ?? '', username },
           contacts: enrichedCtx,
           messages: cleanMsgs,
-          profile: profileRef.current ? {
-            ...profileRef.current,
-            // Strip full base64 avatarUrl (too large) but keep 40x40 thumbnail for relay
-            avatarUrl: profileRef.current.avatarUrl?.startsWith('http') ? profileRef.current.avatarUrl : null,
-            _thumbUrl: (profileRef.current as any)._thumbUrl ?? null,
-          } : {},
+          profile: profileRef.current ? await (async () => {
+            const av = profileRef.current!.avatarUrl;
+            // Compress base64 avatar to 64x64 thumbnail (~3KB) for backup
+            const { compressAvatarForBackup } = await import('./lib/cloudBackup');
+            const compressed = av ? await compressAvatarForBackup(av) : null;
+            return { ...profileRef.current, avatarUrl: compressed };
+          })() : {},
         });
       } catch { /* silent */ }
     }, 3000);
@@ -827,7 +829,11 @@ Answer questions about PMT, PMChain, the app, or anything else the user asks.`, 
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
                       wallet:{address:wallet?.address??'',privateKey:wallet?.privateKey??'',username:uname},
-                      contacts:enrichedC,messages:cleanMsgs,profile:profileRef.current??{}
+                      contacts:enrichedC,messages:cleanMsgs,profile:profileRef.current ? await (async()=>{
+                        const {compressAvatarForBackup:cab}=await import('./lib/cloudBackup');
+                        const av=profileRef.current!.avatarUrl;
+                        return {...profileRef.current,avatarUrl:av?await cab(av):null};
+                      })() : {}
                     });
                     setShowBackupPrompt(false);setBackupPromptPassword('');
                   }catch(err:any){setBackupPromptErr(err.message||'Failed — check password');}
@@ -856,7 +862,11 @@ Answer questions about PMT, PMChain, the app, or anything else the user asks.`, 
                     const{saveCloudBackup:scb}=await import('./lib/cloudBackup');
                     await scb(uname,backupPromptPassword,{
                       wallet:{address:wallet?.address??'',privateKey:wallet?.privateKey??'',username:uname},
-                      contacts:enrichedC,messages:cleanMsgs,profile:profileRef.current??{}
+                      contacts:enrichedC,messages:cleanMsgs,profile:profileRef.current ? await (async()=>{
+                        const {compressAvatarForBackup:cab}=await import('./lib/cloudBackup');
+                        const av=profileRef.current!.avatarUrl;
+                        return {...profileRef.current,avatarUrl:av?await cab(av):null};
+                      })() : {}
                     });
                     setShowBackupPrompt(false);setBackupPromptPassword('');
                   }catch(err:any){setBackupPromptErr(err.message||'Failed — check password');}

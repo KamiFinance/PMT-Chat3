@@ -47,6 +47,31 @@ export interface BackupData {
   profile: object;
 }
 
+// Compress a base64 image to a small backup-safe thumbnail (64x64, JPEG ~3KB)
+export async function compressAvatarForBackup(dataUrl: string): Promise<string | null> {
+  if (!dataUrl) return null;
+  if (!dataUrl.startsWith('data:')) return dataUrl; // already a URL
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        const SIZE = 64;
+        const canvas = document.createElement('canvas');
+        canvas.width = SIZE; canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(dataUrl); return; }
+        const s = Math.min(img.width, img.height);
+        const sx = (img.width - s) / 2;
+        const sy = (img.height - s) / 2;
+        ctx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    } catch { resolve(null); }
+  });
+}
+
 /**
  * Save encrypted backup directly to Redis via /api/auth.
  * No Pinata/IPFS required — works with zero external config.
