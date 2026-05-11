@@ -147,6 +147,7 @@ input,textarea,select{font-size:16px!important}
 .chat-passthrough input,
 .chat-passthrough textarea,
 .chat-passthrough select,
+.chat-passthrough [contenteditable],
 .chat-passthrough [role="button"],
 .chat-passthrough [data-attach],
 .chat-passthrough [data-attach] *,
